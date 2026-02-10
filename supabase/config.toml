@@ -1,0 +1,4 @@
+project_id = "frbbhhwzmrbznpjjhytm"
+
+[functions.log-heartbeat]
+verify_jwt = false
