@@ -219,8 +219,8 @@ export default function Projects() {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-1">
-                  {p.keywords.length > 0 ? (
-                    p.keywords.map((k) => (
+                  {(p.keywords ?? []).length > 0 ? (
+                    (p.keywords ?? []).map((k) => (
                       <Badge key={k} variant="outline" className="text-xs">
                         {k}
                       </Badge>
