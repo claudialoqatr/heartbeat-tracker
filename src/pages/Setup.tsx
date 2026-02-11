@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Copy, CheckCircle, ExternalLink } from "lucide-react";
+import { Copy, CheckCircle, ExternalLink, Zap, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const TAMPERMONKEY_SCRIPT = `// ==UserScript==
@@ -96,6 +96,7 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 
 export default function Setup() {
   const [copied, setCopied] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -217,6 +218,51 @@ export default function Setup() {
           </CardHeader>
           <CardContent>
             <pre className="text-xs bg-muted p-4 rounded overflow-auto max-h-64">{readyScript}</pre>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>4. Test Connection</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={testing}
+              onClick={async () => {
+                setTesting(true);
+                try {
+                  const res = await fetch(`${supabaseUrl}/functions/v1/log-heartbeat`, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      apikey: anonKey || "",
+                    },
+                    body: JSON.stringify({
+                      doc_identifier: "test-connection",
+                      title: "Test Heartbeat",
+                      domain: "setup-page.test",
+                    }),
+                  });
+                  if (!res.ok) throw new Error(`Status ${res.status}`);
+                  toast.success("Connection successful! Test heartbeat logged.");
+                } catch (e: any) {
+                  toast.error(`Connection failed: ${e.message}`);
+                } finally {
+                  setTesting(false);
+                }
+              }}
+            >
+              {testing ? (
+                <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Testing…</>
+              ) : (
+                <><Zap className="h-3.5 w-3.5 mr-1" /> Test Connection</>
+              )}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Send a test heartbeat to verify the backend is reachable and working correctly.
+            </p>
           </CardContent>
         </Card>
 
