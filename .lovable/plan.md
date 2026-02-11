@@ -1,52 +1,26 @@
 
-# Fix: Heartbeat Logging Not Working
+
+# Fix: Redeploy the Backend Function
 
 ## Problem
-Two issues are preventing heartbeats from being logged:
+The `log-heartbeat` backend function is returning a **404 Not Found** error. This means even though your Tampermonkey script is running correctly in the browser, the heartbeats have nowhere to go -- the backend isn't there to receive them.
 
-1. **The backend function is not deployed** -- it returns a 404 error when called. It needs to be redeployed.
-2. **CORS issue in the Tampermonkey script** -- the `fetchSelector()` function uses the standard browser `fetch()` API, which is blocked by CORS in userscripts. It should use `GM_xmlhttpRequest` (which bypasses CORS) consistently for all requests, not just the POST.
+The script template code in Setup.tsx is correct (it already uses the CORS-bypassing method).
 
-## Fix Plan
+## Fix
 
 ### Step 1: Redeploy the backend function
-- Deploy the `log-heartbeat` function so it's accessible again.
+The `log-heartbeat` function needs to be redeployed. No code changes are needed -- the function code already exists, it just needs to be pushed to the server.
 
-### Step 2: Fix the Tampermonkey script template
-Update `src/pages/Setup.tsx` to fix the `fetchSelector` function:
-- Replace the `fetch()` call with `GM_xmlhttpRequest` wrapped in a Promise, so both GET (selector fetch) and POST (heartbeat send) use the same CORS-bypassing method.
-
-### Step 3: Verify deployment
-- Call the function endpoint to confirm it responds correctly.
+### Step 2: Verify it's working
+After deployment, confirm the function responds correctly by calling it.
 
 ---
 
-**After these changes:** You will need to re-copy the updated script from the Setup page and paste it into Tampermonkey again (replacing the old one), then reload the Gemini page and interact with it for ~30 seconds. A heartbeat should then appear in the dashboard.
+## After the fix
+Once deployed, you'll need to:
+1. Re-open Gemini in your browser
+2. Interact with the page for about 30-60 seconds
+3. Heartbeats should start appearing in the dashboard
 
-## Technical Details
-
-The updated `fetchSelector` function in the script template will change from:
-
-```javascript
-// OLD (broken due to CORS)
-const resp = await fetch(FUNCTION_URL + '?domain=' + domain, {
-  headers: { 'apikey': SUPABASE_ANON_KEY }
-});
-selectorCache = await resp.json();
-```
-
-To:
-
-```javascript
-// NEW (uses GM_xmlhttpRequest to bypass CORS)
-const resp = await new Promise((resolve, reject) => {
-  GM_xmlhttpRequest({
-    method: 'GET',
-    url: FUNCTION_URL + '?domain=' + domain,
-    headers: { 'apikey': SUPABASE_ANON_KEY },
-    onload: (r) => resolve(JSON.parse(r.responseText)),
-    onerror: reject,
-  });
-});
-selectorCache = resp;
-```
+No changes to the Tampermonkey script are needed -- the current version is correct.
