@@ -37,10 +37,16 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
   async function fetchSelector() {
     if (selectorCache) return selectorCache;
     try {
-      const resp = await fetch(FUNCTION_URL + '?domain=' + domain, {
-        headers: { 'apikey': SUPABASE_ANON_KEY }
+      const resp = await new Promise((resolve, reject) => {
+        GM_xmlhttpRequest({
+          method: 'GET',
+          url: FUNCTION_URL + '?domain=' + domain,
+          headers: { 'apikey': SUPABASE_ANON_KEY },
+          onload: (r) => resolve(JSON.parse(r.responseText)),
+          onerror: reject,
+        });
       });
-      selectorCache = await resp.json();
+      selectorCache = resp;
       return selectorCache;
     } catch(e) { console.error('Selector fetch failed', e); return null; }
   }
