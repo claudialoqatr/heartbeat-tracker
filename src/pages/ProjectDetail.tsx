@@ -14,6 +14,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format, startOfDay, endOfDay, subDays, differenceInMinutes } from "date-fns";
 import { ArrowLeft, CalendarIcon, Clock, FileText, Globe } from "lucide-react";
+import DomainIcon from "@/components/DomainIcon";
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -225,7 +226,8 @@ export default function ProjectDetail() {
                       <p className="font-medium truncate">
                         {doc.title || doc.doc_identifier}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
+                      <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                        <DomainIcon domain={doc.domain} size={14} />
                         {doc.domain} · Last active{" "}
                         {format(new Date(doc.updated_at), "MMM d, yyyy")}
                       </p>

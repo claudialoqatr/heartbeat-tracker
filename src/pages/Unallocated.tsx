@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import DomainIcon from "@/components/DomainIcon";
 
 export default function Unallocated() {
   const qc = useQueryClient();
@@ -101,7 +102,8 @@ export default function Unallocated() {
                   <p className="font-medium truncate">
                     {doc.title || doc.doc_identifier}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                    <DomainIcon domain={doc.domain} size={14} />
                     {doc.domain} · {new Date(doc.created_at).toLocaleDateString()}
                   </p>
                 </div>
