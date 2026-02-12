@@ -1,0 +1,1 @@
+ALTER TABLE public.selectors ADD COLUMN url_template text;
