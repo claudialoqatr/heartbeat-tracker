@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Unallocated() {
@@ -55,6 +56,27 @@ export default function Unallocated() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (docId: string) => {
+      // Delete heartbeats first (foreign key)
+      const { error: hbError } = await supabase
+        .from("heartbeats")
+        .delete()
+        .eq("document_id", docId);
+      if (hbError) throw hbError;
+      const { error } = await supabase
+        .from("documents")
+        .delete()
+        .eq("id", docId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["unallocated-docs"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-unallocated"] });
+      toast.success("Document deleted");
+    },
+  });
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -83,28 +105,39 @@ export default function Unallocated() {
                     {doc.domain} · {new Date(doc.created_at).toLocaleDateString()}
                   </p>
                 </div>
-                <Select
-                  onValueChange={(projectId) =>
-                    assignMutation.mutate({ docId: doc.id, projectId })
-                  }
-                >
-                  <SelectTrigger className="w-48 ml-4">
-                    <SelectValue placeholder="Assign project…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projects.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="h-2 w-2 rounded-full"
-                            style={{ backgroundColor: p.color }}
-                          />
-                          {p.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-2 ml-4">
+                  <Select
+                    onValueChange={(projectId) =>
+                      assignMutation.mutate({ docId: doc.id, projectId })
+                    }
+                  >
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Assign project…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="h-2 w-2 rounded-full"
+                              style={{ backgroundColor: p.color }}
+                            />
+                            {p.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={() => deleteMutation.mutate(doc.id)}
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}
