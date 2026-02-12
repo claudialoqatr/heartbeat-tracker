@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
     }
 
     // POST: log a heartbeat
-    const { doc_identifier, title, domain } = await req.json();
+    const { doc_identifier, title, domain, url } = await req.json();
     if (!doc_identifier || !domain) {
       return new Response(JSON.stringify({ error: "doc_identifier and domain required" }), {
         status: 400,
@@ -41,9 +41,11 @@ Deno.serve(async (req) => {
     }
 
     // Upsert document
+    const upsertData: Record<string, unknown> = { doc_identifier, title, domain };
+    if (url) upsertData.url = url;
     const { data: doc, error: docError } = await supabase
       .from("documents")
-      .upsert({ doc_identifier, title, domain }, { onConflict: "doc_identifier", ignoreDuplicates: false })
+      .upsert(upsertData, { onConflict: "doc_identifier", ignoreDuplicates: false })
       .select("id")
       .single();
     if (docError) throw docError;

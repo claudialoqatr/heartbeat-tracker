@@ -103,7 +103,7 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
           'Content-Type': 'application/json',
           'apikey': SUPABASE_ANON_KEY,
         },
-        data: JSON.stringify({ doc_identifier, title, domain }),
+        data: JSON.stringify({ doc_identifier, title, domain, url: window.location.href }),
       });
       lastSent = now;
       console.log('[TimeTracker] Heartbeat sent for', title, '(' + domain + ')');
