@@ -33,7 +33,7 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
   if (window.top !== window.self) return;
 
   // Skip known Google Docs system/background URLs
-  const junkPaths = ['/offline/', '/_/og/', '/_/ss/', '/_/doc/', '/robots.txt'];
+  const junkPaths = ['/offline/', '/_/', '/robots.txt'];
   if (junkPaths.some(p => window.location.pathname.startsWith(p))) {
     console.log('[TimeTracker] Skipped system URL:', window.location.pathname);
     return;
