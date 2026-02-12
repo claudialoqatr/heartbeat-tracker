@@ -253,13 +253,9 @@ export default function Setup() {
               }}
             >
               {testing ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Testing…
-                </>
+                <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Testing…</>
               ) : (
-                <>
-                  <Zap className="h-3.5 w-3.5 mr-1" /> Test Connection
-                </>
+                <><Zap className="h-3.5 w-3.5 mr-1" /> Test Connection</>
               )}
             </Button>
           </CardHeader>
