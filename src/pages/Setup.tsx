@@ -16,6 +16,11 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 // @match        https://meet.google.com/*
 // @match        https://chatgpt.com/*
 // @match        https://gemini.google.com/*
+// @match        https://docs.google.com/spreadsheets/*
+// @match        https://docs.google.com/presentation/*
+// @match        https://www.figma.com/file/*
+// @match        https://github.com/*
+// @match        https://mail.google.com/*
 // @grant        GM_xmlhttpRequest
 // @connect      *.supabase.co
 // @noframes
