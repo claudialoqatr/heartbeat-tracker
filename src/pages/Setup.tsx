@@ -23,6 +23,7 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 // @match        https://github.com/*
 // @match        https://mail.google.com/*
 // @match        https://lucid.app/lucidchart/*
+// @match        https://notebooklm.google.com/notebook/*
 // @grant        GM_xmlhttpRequest
 // @connect      *.supabase.co
 // @noframes
@@ -360,14 +361,22 @@ export default function Setup() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              The tracker uses an <strong>identity handshake</strong> — heartbeats are only recorded when the Google account active in your browser matches the email you signed up with ({user?.email || "your account email"}).
+              The tracker uses an <strong>identity handshake</strong> — heartbeats are only recorded when the Google
+              account active in your browser matches the email you signed up with ({user?.email || "your account email"}
+              ).
             </p>
             <div className="text-sm text-muted-foreground space-y-1">
               <p className="font-medium text-foreground">Common issues:</p>
               <ul className="list-disc list-inside space-y-1">
-                <li>You're logged into a different Google account than <code className="text-xs bg-muted px-1 rounded">{user?.email || "your signup email"}</code></li>
+                <li>
+                  You're logged into a different Google account than{" "}
+                  <code className="text-xs bg-muted px-1 rounded">{user?.email || "your signup email"}</code>
+                </li>
                 <li>You're browsing in incognito mode (no Google account visible)</li>
-                <li>A Google UI update changed the email selectors — check the browser console for <code className="text-xs bg-muted px-1 rounded">[TimeTracker]</code> warnings</li>
+                <li>
+                  A Google UI update changed the email selectors — check the browser console for{" "}
+                  <code className="text-xs bg-muted px-1 rounded">[TimeTracker]</code> warnings
+                </li>
               </ul>
             </div>
           </CardContent>
