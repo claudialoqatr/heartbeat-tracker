@@ -24,6 +24,7 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 // @match        https://mail.google.com/*
 // @match        https://lucid.app/lucidchart/*
 // @match        https://notebooklm.google.com/notebook/*
+// @match        https://*.lovable.app/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -192,7 +193,7 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 export default function Setup() {
   const [copied, setCopied] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'synced' | 'error'>('idle');
+  const [syncStatus, setSyncStatus] = useState<"idle" | "synced" | "error">("idle");
   const [scriptDetected, setScriptDetected] = useState(false);
   const { user } = useAuth();
 
@@ -221,20 +222,20 @@ export default function Setup() {
   // Listen for script responses (sync success + ping)
   useEffect(() => {
     const handler = (event: MessageEvent) => {
-      if (event.data?.type === 'SYNC_SUCCESS') {
-        setSyncStatus('synced');
+      if (event.data?.type === "SYNC_SUCCESS") {
+        setSyncStatus("synced");
         toast.success("Identity synced successfully with the Tampermonkey script!");
       }
-      if (event.data?.type === 'PING_SCRIPT_RESPONSE') {
+      if (event.data?.type === "PING_SCRIPT_RESPONSE") {
         setScriptDetected(true);
       }
     };
-    window.addEventListener('message', handler);
+    window.addEventListener("message", handler);
 
     // Ping the script to check if it's installed
-    window.postMessage({ type: 'PING_SCRIPT_REQUEST' }, '*');
+    window.postMessage({ type: "PING_SCRIPT_REQUEST" }, "*");
 
-    return () => window.removeEventListener('message', handler);
+    return () => window.removeEventListener("message", handler);
   }, []);
 
   const syncIdentity = () => {
@@ -242,16 +243,16 @@ export default function Setup() {
       window.postMessage({ type: "SYNC_IDENTITY", email: user.email }, "*");
       // If no SYNC_SUCCESS received within 3s, mark error
       const timeout = setTimeout(() => {
-        setSyncStatus((prev) => (prev === 'synced' ? prev : 'error'));
+        setSyncStatus((prev) => (prev === "synced" ? prev : "error"));
       }, 3000);
       // Clear timeout if success arrives
       const successHandler = (event: MessageEvent) => {
-        if (event.data?.type === 'SYNC_SUCCESS') {
+        if (event.data?.type === "SYNC_SUCCESS") {
           clearTimeout(timeout);
-          window.removeEventListener('message', successHandler);
+          window.removeEventListener("message", successHandler);
         }
       };
-      window.addEventListener('message', successHandler);
+      window.addEventListener("message", successHandler);
     }
   };
 
@@ -362,17 +363,12 @@ export default function Setup() {
                 </Badge>
               )}
             </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!user?.email}
-              onClick={syncIdentity}
-            >
-              {syncStatus === 'synced' ? (
+            <Button variant="outline" size="sm" disabled={!user?.email} onClick={syncIdentity}>
+              {syncStatus === "synced" ? (
                 <>
                   <CheckCircle className="h-3.5 w-3.5 mr-1 text-accent" /> Synced
                 </>
-              ) : syncStatus === 'error' ? (
+              ) : syncStatus === "error" ? (
                 <>
                   <AlertTriangle className="h-3.5 w-3.5 mr-1 text-destructive" /> Retry Sync
                 </>
@@ -384,13 +380,16 @@ export default function Setup() {
             </Button>
           </CardHeader>
           <CardContent className="space-y-2">
-            {syncStatus === 'error' && (
+            {syncStatus === "error" && (
               <p className="text-sm text-destructive">
-                No response from the script. Make sure Tampermonkey is installed and the script is enabled, then try again.
+                No response from the script. Make sure Tampermonkey is installed and the script is enabled, then try
+                again.
               </p>
             )}
             <p className="text-sm text-muted-foreground">
-              This broadcasts your email (<code className="text-xs bg-muted px-1 rounded">{user?.email || "…"}</code>) to the Tampermonkey script via <code className="text-xs bg-muted px-1 rounded">GM_setValue</code>. The script confirms receipt automatically.
+              This broadcasts your email (<code className="text-xs bg-muted px-1 rounded">{user?.email || "…"}</code>)
+              to the Tampermonkey script via <code className="text-xs bg-muted px-1 rounded">GM_setValue</code>. The
+              script confirms receipt automatically.
             </p>
             <p className="text-sm text-muted-foreground">
               Once synced, the script remembers your identity permanently — no site-specific email scraping needed.
@@ -471,12 +470,8 @@ export default function Setup() {
                 <li>
                   You see "No synced identity" in the console — open this Setup page once with Tampermonkey active
                 </li>
-                <li>
-                  You changed your account email — click "Sync Identity" above to update the script
-                </li>
-                <li>
-                  You reinstalled Tampermonkey — script storage was cleared, sync again from here
-                </li>
+                <li>You changed your account email — click "Sync Identity" above to update the script</li>
+                <li>You reinstalled Tampermonkey — script storage was cleared, sync again from here</li>
               </ul>
             </div>
           </CardContent>
