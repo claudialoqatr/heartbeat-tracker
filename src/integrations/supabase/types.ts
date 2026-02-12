@@ -142,16 +142,19 @@ export type Database = {
         Row: {
           api_key: string
           created_at: string
+          email: string | null
           id: string
         }
         Insert: {
           api_key?: string
           created_at?: string
+          email?: string | null
           id: string
         }
         Update: {
           api_key?: string
           created_at?: string
+          email?: string | null
           id?: string
         }
         Relationships: []
@@ -234,7 +237,9 @@ export type Database = {
       }
     }
     Functions: {
-      get_user_id_by_api_key: { Args: { _key: string }; Returns: string }
+      get_user_id_by_api_key:
+        | { Args: { _key: string }; Returns: string }
+        | { Args: { _email: string; _key: string }; Returns: string }
       perform_31day_rollup: { Args: never; Returns: undefined }
     }
     Enums: {
