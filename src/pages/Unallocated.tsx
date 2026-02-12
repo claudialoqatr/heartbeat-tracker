@@ -99,9 +99,15 @@ export default function Unallocated() {
             <Card key={doc.id}>
               <CardContent className="flex items-center justify-between py-4">
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium truncate">
-                    {doc.title || doc.doc_identifier}
-                  </p>
+                  {doc.url ? (
+                    <a href={doc.url} target="_blank" rel="noopener noreferrer" className="font-medium truncate hover:underline text-primary">
+                      {doc.title || doc.doc_identifier}
+                    </a>
+                  ) : (
+                    <p className="font-medium truncate">
+                      {doc.title || doc.doc_identifier}
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
                     <DomainIcon domain={doc.domain} size={14} />
                     {doc.domain} · {new Date(doc.created_at).toLocaleDateString()}

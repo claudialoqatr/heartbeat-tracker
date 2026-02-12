@@ -24,6 +24,7 @@ export type Database = {
           project_id: string | null
           title: string | null
           updated_at: string
+          url: string | null
         }
         Insert: {
           auto_tagged?: boolean
@@ -34,6 +35,7 @@ export type Database = {
           project_id?: string | null
           title?: string | null
           updated_at?: string
+          url?: string | null
         }
         Update: {
           auto_tagged?: boolean
@@ -44,6 +46,7 @@ export type Database = {
           project_id?: string | null
           title?: string | null
           updated_at?: string
+          url?: string | null
         }
         Relationships: [
           {
