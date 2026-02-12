@@ -122,6 +122,7 @@ export type Database = {
           domain: string
           id: string
           title_selector: string
+          url_template: string | null
         }
         Insert: {
           created_at?: string
@@ -130,6 +131,7 @@ export type Database = {
           domain: string
           id?: string
           title_selector: string
+          url_template?: string | null
         }
         Update: {
           created_at?: string
@@ -138,6 +140,7 @@ export type Database = {
           domain?: string
           id?: string
           title_selector?: string
+          url_template?: string | null
         }
         Relationships: []
       }
