@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Copy, CheckCircle, ExternalLink, Zap, Loader2 } from "lucide-react";
+import { Copy, CheckCircle, ExternalLink, Zap, Loader2, Key } from "lucide-react";
 import { toast } from "sonner";
 
 const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 // @name         GSuite Time Tracker Heartbeat
 // @namespace    timetracker
-// @version      1.0
+// @version      1.1
 // @description  Sends activity heartbeats to your Time Tracker backend
 // @match        https://docs.google.com/*
 // @match        https://meet.google.com/*
@@ -42,6 +43,7 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
   // ⚠️ REPLACE THESE WITH YOUR VALUES
   const SUPABASE_URL = 'YOUR_SUPABASE_URL';
   const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
+  const API_KEY = 'YOUR_API_KEY';
   const FUNCTION_URL = SUPABASE_URL + '/functions/v1/log-heartbeat';
 
   let lastActivity = Date.now();
@@ -58,7 +60,10 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
         GM_xmlhttpRequest({
           method: 'GET',
           url: FUNCTION_URL + '?domain=' + domain,
-          headers: { 'apikey': SUPABASE_ANON_KEY },
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'x-api-key': API_KEY,
+          },
           onload: (r) => resolve(JSON.parse(r.responseText)),
           onerror: reject,
         });
@@ -110,6 +115,7 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
         headers: {
           'Content-Type': 'application/json',
           'apikey': SUPABASE_ANON_KEY,
+          'x-api-key': API_KEY,
         },
         data: JSON.stringify({ doc_identifier, title, domain, url }),
       });
@@ -145,9 +151,24 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 export default function Setup() {
   const [copied, setCopied] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  const { user } = useAuth();
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+  const { data: profile } = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("api_key")
+        .eq("id", user!.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
 
   const { data: selectors = [] } = useQuery({
     queryKey: ["selectors"],
@@ -165,16 +186,48 @@ export default function Setup() {
     setTimeout(() => setCopied(null), 2000);
   };
 
-  const readyScript = TAMPERMONKEY_SCRIPT.replace("YOUR_SUPABASE_URL", supabaseUrl || "").replace(
-    "YOUR_ANON_KEY",
-    anonKey || "",
-  );
+  const readyScript = TAMPERMONKEY_SCRIPT
+    .replace("YOUR_SUPABASE_URL", supabaseUrl || "")
+    .replace("YOUR_ANON_KEY", anonKey || "")
+    .replace("YOUR_API_KEY", profile?.api_key || "YOUR_API_KEY");
 
   return (
     <div>
       <h1 className="text-3xl font-bold mb-6">Setup Guide</h1>
 
       <div className="space-y-6">
+        {/* API Key card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5" /> Your API Key
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              This key authenticates your Tampermonkey script. It's already embedded in the script below.
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs bg-muted p-2 rounded break-all font-mono">
+                {profile?.api_key || "Loading…"}
+              </code>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                disabled={!profile?.api_key}
+                onClick={() => copyToClipboard(profile?.api_key || "", "API Key")}
+              >
+                {copied === "API Key" ? (
+                  <CheckCircle className="h-3.5 w-3.5 text-accent" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>1. Install Tampermonkey</CardTitle>
@@ -204,54 +257,8 @@ export default function Setup() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>2. Connection Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">API Endpoint</label>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 text-xs bg-muted p-2 rounded break-all">
-                  {supabaseUrl}/functions/v1/log-heartbeat
-                </code>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  onClick={() => copyToClipboard(`${supabaseUrl}/functions/v1/log-heartbeat`, "Endpoint")}
-                >
-                  {copied === "Endpoint" ? (
-                    <CheckCircle className="h-3.5 w-3.5 text-accent" />
-                  ) : (
-                    <Copy className="h-3.5 w-3.5" />
-                  )}
-                </Button>
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">Anon Key</label>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 text-xs bg-muted p-2 rounded break-all">{anonKey?.slice(0, 20)}…</code>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  onClick={() => copyToClipboard(anonKey || "", "Key")}
-                >
-                  {copied === "Key" ? (
-                    <CheckCircle className="h-3.5 w-3.5 text-accent" />
-                  ) : (
-                    <Copy className="h-3.5 w-3.5" />
-                  )}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>3. Install the Script</CardTitle>
+            <CardTitle>2. Install the Script</CardTitle>
             <Button variant="outline" size="sm" onClick={() => copyToClipboard(readyScript, "Script")}>
               {copied === "Script" ? (
                 <>
@@ -271,11 +278,11 @@ export default function Setup() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>4. Test Connection</CardTitle>
+            <CardTitle>3. Test Connection</CardTitle>
             <Button
               variant="outline"
               size="sm"
-              disabled={testing}
+              disabled={testing || !profile?.api_key}
               onClick={async () => {
                 setTesting(true);
                 try {
@@ -284,6 +291,7 @@ export default function Setup() {
                     headers: {
                       "Content-Type": "application/json",
                       apikey: anonKey || "",
+                      "x-api-key": profile?.api_key || "",
                     },
                     body: JSON.stringify({
                       doc_identifier: "test-connection",

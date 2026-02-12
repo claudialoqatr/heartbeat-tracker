@@ -25,6 +25,7 @@ export type Database = {
           title: string | null
           updated_at: string
           url: string | null
+          user_id: string | null
         }
         Insert: {
           auto_tagged?: boolean
@@ -36,6 +37,7 @@ export type Database = {
           title?: string | null
           updated_at?: string
           url?: string | null
+          user_id?: string | null
         }
         Update: {
           auto_tagged?: boolean
@@ -47,6 +49,7 @@ export type Database = {
           title?: string | null
           updated_at?: string
           url?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -64,18 +67,21 @@ export type Database = {
           domain: string
           id: string
           recorded_at: string
+          user_id: string | null
         }
         Insert: {
           document_id: string
           domain: string
           id?: string
           recorded_at?: string
+          user_id?: string | null
         }
         Update: {
           document_id?: string
           domain?: string
           id?: string
           recorded_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -87,6 +93,24 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          api_key: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          api_key?: string
+          created_at?: string
+          id: string
+        }
+        Update: {
+          api_key?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           color: string
@@ -95,6 +119,7 @@ export type Database = {
           keywords: string[]
           name: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           color?: string
@@ -103,6 +128,7 @@ export type Database = {
           keywords?: string[]
           name: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           color?: string
@@ -111,6 +137,7 @@ export type Database = {
           keywords?: string[]
           name?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -123,6 +150,7 @@ export type Database = {
           id: string
           title_selector: string
           url_template: string | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -132,6 +160,7 @@ export type Database = {
           id?: string
           title_selector: string
           url_template?: string | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -141,6 +170,7 @@ export type Database = {
           id?: string
           title_selector?: string
           url_template?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -149,7 +179,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_id_by_api_key: { Args: { _key: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never

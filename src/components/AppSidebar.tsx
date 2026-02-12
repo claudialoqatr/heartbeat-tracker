@@ -6,7 +6,10 @@ import {
   Activity,
   BarChart3,
   Settings,
+  LogOut,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -19,6 +22,7 @@ const navItems = [
 
 export default function AppSidebar() {
   const location = useLocation();
+  const { signOut, user } = useAuth();
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
@@ -50,8 +54,19 @@ export default function AppSidebar() {
         })}
       </nav>
 
-      <div className="border-t border-sidebar-border p-4">
-        <p className="text-xs text-sidebar-foreground/50">GSuite Time Tracker</p>
+      <div className="border-t border-sidebar-border p-4 space-y-2">
+        {user && (
+          <p className="text-xs text-sidebar-foreground/50 truncate">{user.email}</p>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground"
+          onClick={signOut}
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Sign Out
+        </Button>
       </div>
     </aside>
   );

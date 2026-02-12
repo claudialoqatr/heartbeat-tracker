@@ -122,7 +122,9 @@ export default function Projects() {
 
   const createMutation = useMutation({
     mutationFn: async (p: { name: string; color: string; keywords: string[] }) => {
-      const { error } = await supabase.from("projects").insert(p);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { error } = await supabase.from("projects").insert({ ...p, user_id: user.id });
       if (error) throw error;
     },
     onSuccess: () => {
