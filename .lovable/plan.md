@@ -1,42 +1,69 @@
 
 
-# Fix: Tampermonkey Script Not Detecting Activity
+## URL Template Support for Selectors
 
-## Problem
+### Context
 
-The script is installed and the backend works, but **zero requests are reaching the server**. There are two issues in the script template:
+The `documents.url` column and direct `window.location.href` capture are already implemented. This plan adds a `url_template` column to `selectors` so URLs can be reconstructed from extracted `doc_identifier` values -- useful as a fallback and for cleaner, canonical URLs.
 
-1. **Scroll events don't bubble** -- Google Docs and Gemini scroll inside nested containers (iframes, divs with `overflow: scroll`). The current `document.addEventListener('scroll', ...)` never fires because those events don't bubble up to the document level.
+### Changes
 
-2. **No debug logging** -- When a heartbeat is skipped (due to inactivity timeout or rate limiting), nothing is logged to the console, making it impossible to tell if the script is even running.
+**1. Database Migration**
 
-3. **`lastActivity` starts at 0** -- Even if `mousemove` fires, the very first check at 30s sees `now - 0 > 120000` is false (good), but if the user loaded the page and waited, the inactivity gap could block it. More importantly, if scroll is the *only* interaction, `lastActivity` stays at 0 forever, and the inactivity check blocks all heartbeats.
+Add `url_template` (text, nullable) to the `selectors` table, then update existing rows:
 
-## Changes
+| Domain | url_template |
+|---|---|
+| docs.google.com | `https://docs.google.com/document/d/{id}` |
+| gemini.google.com | `https://gemini.google.com/app/{id}` |
+| chatgpt.com | `https://chatgpt.com/c/{id}` |
+| meet.google.com | `https://meet.google.com/{id}` |
+| figma.com | `https://www.figma.com/file/{id}` |
+| github.com | `https://github.com/{id}` |
+| mail.google.com | `https://mail.google.com/mail/#inbox/{id}` |
 
-### Update the script template in `src/pages/Setup.tsx`
+Note: Google Sheets and Slides share the `docs.google.com` domain with Docs. Since there is only one selector row per domain, the current template will default to the Docs pattern. The direct `window.location.href` (already captured) will always be the accurate URL for Sheets/Slides documents.
 
-The `TAMPERMONKEY_SCRIPT` constant will be updated with:
+**2. Tampermonkey Script Update (src/pages/Setup.tsx)**
 
-**Activity detection fixes:**
-- Add `{ capture: true }` to `scroll` listener so it catches events from nested/child containers
-- Add `visibilitychange` listener -- if the tab is visible and focused, that counts as activity
-- Add `touchstart` and `touchmove` for trackpad/mobile users
-- Initialize `lastActivity = Date.now()` so the script doesn't start in an "inactive" state
+After fetching the selector and extracting `doc_identifier`, add logic to build a `finalUrl`:
 
-**Debug logging:**
-- Log when heartbeat is skipped due to rate limit ("too soon")
-- Log when heartbeat is skipped due to inactivity timeout
-- Log when heartbeat is successfully sent
-- Log when activity is detected (throttled to avoid spam)
+- If the selector has a `url_template`, replace `{id}` with the extracted `doc_identifier`.
+- Otherwise, fall back to `window.location.href` (current behavior).
+- Send `finalUrl` as the `url` field in the heartbeat payload.
 
-**No other files change.** The backend function and database are confirmed working.
+**3. Edge Function (supabase/functions/log-heartbeat/index.ts)**
 
-## After the fix
+Already handles `url` in the upsert -- no changes needed.
 
-You will need to:
-1. Go to the Setup page and click "Copy Script" to get the updated script
-2. Open Tampermonkey and **replace** the existing script with the new one
-3. Reload Google Docs or Gemini
-4. Open the browser console and look for `[TimeTracker]` messages to confirm activity is detected
-5. After 30 seconds of interaction, a heartbeat should fire and appear in the dashboard
+**4. UI (Unallocated, ProjectDetail, Reports)**
+
+Clickable document titles are already implemented on Unallocated and ProjectDetail. Will also check and update the Reports page if document titles appear there.
+
+### Technical Details
+
+- Migration SQL:
+  ```
+  ALTER TABLE public.selectors ADD COLUMN url_template text;
+  UPDATE selectors SET url_template = 'https://docs.google.com/document/d/{id}' WHERE domain = 'docs.google.com';
+  UPDATE selectors SET url_template = 'https://gemini.google.com/app/{id}' WHERE domain = 'gemini.google.com';
+  UPDATE selectors SET url_template = 'https://chatgpt.com/c/{id}' WHERE domain = 'chatgpt.com';
+  UPDATE selectors SET url_template = 'https://meet.google.com/{id}' WHERE domain = 'meet.google.com';
+  UPDATE selectors SET url_template = 'https://www.figma.com/file/{id}' WHERE domain = 'figma.com';
+  UPDATE selectors SET url_template = 'https://github.com/{id}' WHERE domain = 'github.com';
+  UPDATE selectors SET url_template = 'https://mail.google.com/mail/#inbox/{id}' WHERE domain = 'mail.google.com';
+  ```
+
+- Tampermonkey script addition (after `getTitle`):
+  ```javascript
+  function buildUrl(selector, docId) {
+    if (selector?.url_template) {
+      return selector.url_template.replace('{id}', docId);
+    }
+    return window.location.href;
+  }
+  ```
+  Then in `sendHeartbeat`: `const url = buildUrl(selector, doc_identifier);`
+
+- The GET endpoint in `log-heartbeat` already returns the full selector row, so `url_template` will automatically be included in the response -- no edge function changes needed.
+
