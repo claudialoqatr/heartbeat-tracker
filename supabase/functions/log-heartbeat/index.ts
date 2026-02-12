@@ -15,20 +15,20 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Resolve user from API key
     const apiKey = req.headers.get("x-api-key");
-    let userId: string | null = null;
 
-    if (apiKey) {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("api_key", apiKey)
-        .maybeSingle();
-      if (data) userId = data.id;
-    }
-
+    // GET: fetch selectors (no email required)
     if (req.method === "GET") {
+      let userId: string | null = null;
+      if (apiKey) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("api_key", apiKey)
+          .maybeSingle();
+        if (data) userId = data.id;
+      }
+
       const url = new URL(req.url);
       const domain = url.searchParams.get("domain");
       if (!domain) {
@@ -47,15 +47,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    // POST: log a heartbeat
-    if (!userId) {
+    // POST: log a heartbeat with identity verification
+    if (!apiKey) {
       return new Response(JSON.stringify({ error: "Valid x-api-key header required" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { doc_identifier, title, domain, url } = await req.json();
+    const { doc_identifier, title, domain, url, email } = await req.json();
     if (!doc_identifier || !domain) {
       return new Response(JSON.stringify({ error: "doc_identifier and domain required" }), {
         status: 400,
@@ -63,7 +63,31 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Upsert document with user_id
+    // Verify identity: api_key + email must match the same profile
+    if (!email) {
+      return new Response(JSON.stringify({ error: "Identity mismatch. Heartbeat rejected." }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: profileMatch } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("api_key", apiKey)
+      .ilike("email", email)
+      .maybeSingle();
+
+    if (!profileMatch) {
+      return new Response(JSON.stringify({ error: "Identity mismatch. Heartbeat rejected." }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const userId = profileMatch.id;
+
+    // Upsert document
     const upsertData: Record<string, unknown> = { doc_identifier, title, domain, user_id: userId };
     if (url) upsertData.url = url;
     const { data: doc, error: docError } = await supabase
@@ -73,7 +97,7 @@ Deno.serve(async (req) => {
       .single();
     if (docError) throw docError;
 
-    // Insert heartbeat with user_id
+    // Insert heartbeat
     const { error: hbError } = await supabase
       .from("heartbeats")
       .insert({ document_id: doc.id, domain, user_id: userId });

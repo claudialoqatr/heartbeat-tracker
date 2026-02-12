@@ -5,13 +5,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Copy, CheckCircle, ExternalLink, Zap, Loader2, Key } from "lucide-react";
+import { Copy, CheckCircle, ExternalLink, Zap, Loader2, Key, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 // @name         GSuite Time Tracker Heartbeat
 // @namespace    timetracker
-// @version      1.1
+// @version      1.2
 // @description  Sends activity heartbeats to your Time Tracker backend
 // @match        https://docs.google.com/*
 // @match        https://meet.google.com/*
@@ -53,6 +53,25 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
   let lastActivityLog = 0;
 
   const domain = window.location.hostname;
+
+  function getActiveUserEmail() {
+    // GSuite primary
+    const gsuite = document.querySelector(
+      'a[href^="https://accounts.google.com/SignOutOptions"] div:last-child'
+    );
+    if (gsuite?.innerText?.includes('@')) return gsuite.innerText.trim();
+
+    // GSuite fallback (new UI)
+    const fallback = document.querySelector('.gb_d.gb_wa.gb_A');
+    if (fallback?.innerText?.includes('@')) return fallback.innerText.trim();
+
+    // Gemini profile
+    const gemini = document.querySelector('[data-email]');
+    if (gemini) return gemini.getAttribute('data-email');
+
+    console.warn('[TimeTracker] Could not detect Google account email. Heartbeat will be skipped.');
+    return null;
+  }
 
   async function fetchSelector() {
     if (selectorCache) return selectorCache;
@@ -104,6 +123,12 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
       return;
     }
 
+    const email = getActiveUserEmail();
+    if (!email) {
+      console.warn('[TimeTracker] Heartbeat skipped: no email detected. Ensure your Google account is visible on this page.');
+      return;
+    }
+
     const selector = await fetchSelector();
     const doc_identifier = getDocId(selector);
     const title = getTitle(selector);
@@ -118,10 +143,10 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
           'apikey': SUPABASE_ANON_KEY,
           'x-api-key': API_KEY,
         },
-        data: JSON.stringify({ doc_identifier, title, domain, url }),
+        data: JSON.stringify({ doc_identifier, title, domain, url, email }),
       });
       lastSent = now;
-      console.log('[TimeTracker] Heartbeat sent for', title, '(' + domain + ')');
+      console.log('[TimeTracker] Heartbeat sent for', title, '(' + domain + ') as', email);
     } catch(e) { console.error('[TimeTracker] Heartbeat failed', e); }
   }
 
@@ -293,9 +318,13 @@ export default function Setup() {
                       doc_identifier: "test-connection",
                       title: "Test Heartbeat",
                       domain: "setup-page.test",
+                      email: user?.email || "",
                     }),
                   });
-                  if (!res.ok) throw new Error(`Status ${res.status}`);
+                  if (!res.ok) {
+                    const body = await res.json().catch(() => ({}));
+                    throw new Error(body.error || `Status ${res.status}`);
+                  }
                   toast.success("Connection successful! Test heartbeat logged.");
                 } catch (e: any) {
                   toast.error(`Connection failed: ${e.message}`);
@@ -317,8 +346,30 @@ export default function Setup() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Send a test heartbeat to verify the backend is reachable and working correctly.
+              Send a test heartbeat to verify the backend is reachable and your identity matches.
             </p>
+          </CardContent>
+        </Card>
+
+        {/* Troubleshooting card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" /> Troubleshooting
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              The tracker uses an <strong>identity handshake</strong> — heartbeats are only recorded when the Google account active in your browser matches the email you signed up with ({user?.email || "your account email"}).
+            </p>
+            <div className="text-sm text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground">Common issues:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>You're logged into a different Google account than <code className="text-xs bg-muted px-1 rounded">{user?.email || "your signup email"}</code></li>
+                <li>You're browsing in incognito mode (no Google account visible)</li>
+                <li>A Google UI update changed the email selectors — check the browser console for <code className="text-xs bg-muted px-1 rounded">[TimeTracker]</code> warnings</li>
+              </ul>
+            </div>
           </CardContent>
         </Card>
 
