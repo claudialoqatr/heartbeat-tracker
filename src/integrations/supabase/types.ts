@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      daily_stats: {
+        Row: {
+          date: string
+          document_id: string
+          domain: string
+          id: string
+          project_id: string | null
+          total_minutes: number
+          user_id: string
+        }
+        Insert: {
+          date: string
+          document_id: string
+          domain: string
+          id?: string
+          project_id?: string | null
+          total_minutes?: number
+          user_id: string
+        }
+        Update: {
+          date?: string
+          document_id?: string
+          domain?: string
+          id?: string
+          project_id?: string | null
+          total_minutes?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_stats_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_stats_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           auto_tagged: boolean
@@ -176,10 +221,21 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      combined_analytics: {
+        Row: {
+          date: string | null
+          document_id: string | null
+          domain: string | null
+          project_id: string | null
+          total_minutes: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_user_id_by_api_key: { Args: { _key: string }; Returns: string }
+      perform_31day_rollup: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
