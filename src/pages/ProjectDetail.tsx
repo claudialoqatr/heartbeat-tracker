@@ -1,0 +1,253 @@
+import { useState, useMemo } from "react";
+import { useParams, Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format, startOfDay, endOfDay, subDays, differenceInMinutes } from "date-fns";
+import { ArrowLeft, CalendarIcon, Clock, FileText, Globe } from "lucide-react";
+
+export default function ProjectDetail() {
+  const { id } = useParams<{ id: string }>();
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+    from: subDays(new Date(), 7),
+    to: new Date(),
+  });
+
+  const { data: project } = useQuery({
+    queryKey: ["project", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("id", id!)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
+  const { data: documents = [] } = useQuery({
+    queryKey: ["project-docs", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("documents")
+        .select("*")
+        .eq("project_id", id!)
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
+  const docIds = documents.map((d) => d.id);
+
+  const { data: heartbeats = [] } = useQuery({
+    queryKey: ["project-heartbeats", id, dateRange.from.toISOString(), dateRange.to.toISOString()],
+    queryFn: async () => {
+      if (docIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("heartbeats")
+        .select("*")
+        .in("document_id", docIds)
+        .gte("recorded_at", startOfDay(dateRange.from).toISOString())
+        .lte("recorded_at", endOfDay(dateRange.to).toISOString())
+        .order("recorded_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: docIds.length > 0,
+  });
+
+  const stats = useMemo(() => {
+    const totalMinutes = heartbeats.length; // each heartbeat ≈ 1 min
+    const byDoc = new Map<string, number>();
+    for (const hb of heartbeats) {
+      byDoc.set(hb.document_id, (byDoc.get(hb.document_id) || 0) + 1);
+    }
+    return { totalMinutes, byDoc };
+  }, [heartbeats]);
+
+  const formatTime = (minutes: number) => {
+    if (minutes < 60) return `${minutes}m`;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  };
+
+  if (!project) {
+    return <p className="text-muted-foreground">Loading…</p>;
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <Button variant="ghost" size="icon" asChild>
+          <Link to="/projects">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+        <div
+          className="h-4 w-4 rounded-full shrink-0"
+          style={{ backgroundColor: project.color }}
+        />
+        <h1 className="text-3xl font-bold">{project.name}</h1>
+        <div className="flex gap-1 ml-2">
+          {(project.keywords ?? []).map((k: string) => (
+            <Badge key={k} variant="outline" className="text-xs">
+              {k}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      {/* Date range filter */}
+      <div className="flex items-center gap-2 mb-6">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="justify-start text-left font-normal">
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {format(dateRange.from, "MMM d")} – {format(dateRange.to, "MMM d, yyyy")}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="range"
+              selected={{ from: dateRange.from, to: dateRange.to }}
+              onSelect={(range) => {
+                if (range?.from) {
+                  setDateRange({ from: range.from, to: range.to ?? range.from });
+                }
+              }}
+              numberOfMonths={2}
+              className={cn("p-3 pointer-events-auto")}
+            />
+          </PopoverContent>
+        </Popover>
+        <div className="flex gap-1">
+          {[
+            { label: "7d", days: 7 },
+            { label: "30d", days: 30 },
+            { label: "90d", days: 90 },
+          ].map(({ label, days }) => (
+            <Button
+              key={label}
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setDateRange({ from: subDays(new Date(), days), to: new Date() })
+              }
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Stats cards */}
+      <div className="grid gap-4 sm:grid-cols-3 mb-8">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-primary/10 p-2">
+                <Clock className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Time</p>
+                <p className="text-2xl font-bold">{formatTime(stats.totalMinutes)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-accent/10 p-2">
+                <FileText className="h-5 w-5 text-accent" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Documents</p>
+                <p className="text-2xl font-bold">{documents.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-primary/10 p-2">
+                <Globe className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Domains</p>
+                <p className="text-2xl font-bold">
+                  {new Set(documents.map((d) => d.domain)).size}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Document list with time */}
+      <h2 className="text-lg font-semibold mb-3">Documents</h2>
+      {documents.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            No documents assigned to this project yet.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {documents
+            .sort((a, b) => (stats.byDoc.get(b.id) || 0) - (stats.byDoc.get(a.id) || 0))
+            .map((doc) => {
+              const mins = stats.byDoc.get(doc.id) || 0;
+              const pct =
+                stats.totalMinutes > 0
+                  ? Math.round((mins / stats.totalMinutes) * 100)
+                  : 0;
+              return (
+                <Card key={doc.id}>
+                  <CardContent className="flex items-center justify-between py-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">
+                        {doc.title || doc.doc_identifier}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {doc.domain} · Last active{" "}
+                        {format(new Date(doc.updated_at), "MMM d, yyyy")}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-4 ml-4 shrink-0">
+                      <div className="text-right">
+                        <p className="font-semibold">{formatTime(mins)}</p>
+                        <p className="text-xs text-muted-foreground">{pct}%</p>
+                      </div>
+                      <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+        </div>
+      )}
+    </div>
+  );
+}
