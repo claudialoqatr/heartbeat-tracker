@@ -22,6 +22,7 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 // @match        https://www.figma.com/file/*
 // @match        https://github.com/*
 // @match        https://mail.google.com/*
+// @match        https://lucid.app/lucidchart/*
 // @grant        GM_xmlhttpRequest
 // @connect      *.supabase.co
 // @noframes
@@ -159,11 +160,7 @@ export default function Setup() {
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("api_key")
-        .eq("id", user!.id)
-        .single();
+      const { data, error } = await supabase.from("profiles").select("api_key").eq("id", user!.id).single();
       if (error) throw error;
       return data;
     },
@@ -186,8 +183,7 @@ export default function Setup() {
     setTimeout(() => setCopied(null), 2000);
   };
 
-  const readyScript = TAMPERMONKEY_SCRIPT
-    .replace("YOUR_SUPABASE_URL", supabaseUrl || "")
+  const readyScript = TAMPERMONKEY_SCRIPT.replace("YOUR_SUPABASE_URL", supabaseUrl || "")
     .replace("YOUR_ANON_KEY", anonKey || "")
     .replace("YOUR_API_KEY", profile?.api_key || "YOUR_API_KEY");
 
@@ -309,9 +305,13 @@ export default function Setup() {
               }}
             >
               {testing ? (
-                <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Testing…</>
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Testing…
+                </>
               ) : (
-                <><Zap className="h-3.5 w-3.5 mr-1" /> Test Connection</>
+                <>
+                  <Zap className="h-3.5 w-3.5 mr-1" /> Test Connection
+                </>
               )}
             </Button>
           </CardHeader>
