@@ -33,6 +33,7 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 // @noframes
 // ==/UserScript==
 
+
 (function() {
   'use strict';
 
@@ -47,9 +48,9 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
   }
 
   // ⚠️ REPLACED AUTOMATICALLY — do not edit
-  const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-  const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
-  const API_KEY = 'YOUR_API_KEY';
+  const SUPABASE_URL = 'https://frbbhhwzmrbznpjjhytm.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZyYmJoaHd6bXJiem5wampoeXRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NTQ2ODcsImV4cCI6MjA4NjMzMDY4N30.GWenyjeTiZww1aOsdzUf-oTacJYGYv1KALg3wCo0Xec';
+  const API_KEY = '82337f0a-5dcb-4d06-a9cf-9e1fa11d265d';
   const FUNCTION_URL = SUPABASE_URL + '/functions/v1/log-heartbeat';
 
   let lastActivity = Date.now();
@@ -64,20 +65,13 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
     return GM_getValue('synced_user_email', null);
   }
 
-  // Listen for identity sync and ping from the Dashboard page
+  // Listen for identity broadcast from the Dashboard page
   window.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'SYNC_IDENTITY' && event.data.email) {
+    if (event.data && event.data.type === 'TIMETRACKER_SYNC_EMAIL' && event.data.email) {
       GM_setValue('synced_user_email', event.data.email);
-      console.log('[TimeTracker] ✅ Identity synced:', event.data.email);
-      window.postMessage({ type: 'SYNC_SUCCESS' }, '*');
-    }
-    if (event.data && event.data.type === 'PING_SCRIPT_REQUEST') {
-      window.postMessage({ type: 'PING_SCRIPT_RESPONSE' }, '*');
+      console.log('[TimeTracker] Identity synced:', event.data.email);
     }
   });
-
-  // On load, announce presence to the Dashboard
-  window.postMessage({ type: 'PING_SCRIPT_RESPONSE' }, '*');
 
   async function fetchSelector() {
     if (selectorCache) return selectorCache;
