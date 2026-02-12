@@ -65,7 +65,7 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 
   async function sendHeartbeat() {
     const now = Date.now();
-    if (now - lastSent < 10000) return; // At most once per minute
+    if (now - lastSent < 60000) return; // At most once per minute
     if (now - lastActivity > 120000) return; // No activity for 2 min
 
     const selector = await fetchSelector();
@@ -253,9 +253,13 @@ export default function Setup() {
               }}
             >
               {testing ? (
-                <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Testing…</>
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Testing…
+                </>
               ) : (
-                <><Zap className="h-3.5 w-3.5 mr-1" /> Test Connection</>
+                <>
+                  <Zap className="h-3.5 w-3.5 mr-1" /> Test Connection
+                </>
               )}
             </Button>
           </CardHeader>
