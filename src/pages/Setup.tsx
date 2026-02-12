@@ -27,6 +27,13 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
   // Skip if running inside an iframe
   if (window.top !== window.self) return;
 
+  // Skip known Google Docs system/background URLs
+  const junkPaths = ['/offline/', '/_/og/', '/_/ss/', '/_/doc/', '/robots.txt'];
+  if (junkPaths.some(p => window.location.pathname.startsWith(p))) {
+    console.log('[TimeTracker] Skipped system URL:', window.location.pathname);
+    return;
+  }
+
   // ⚠️ REPLACE THESE WITH YOUR VALUES
   const SUPABASE_URL = 'YOUR_SUPABASE_URL';
   const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
