@@ -18,10 +18,14 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 // @match        https://gemini.google.com/*
 // @grant        GM_xmlhttpRequest
 // @connect      *.supabase.co
+// @noframes
 // ==/UserScript==
 
 (function() {
   'use strict';
+
+  // Skip if running inside an iframe
+  if (window.top !== window.self) return;
 
   // ⚠️ REPLACE THESE WITH YOUR VALUES
   const SUPABASE_URL = 'YOUR_SUPABASE_URL';
