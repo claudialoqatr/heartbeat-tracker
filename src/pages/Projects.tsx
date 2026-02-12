@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -103,6 +104,7 @@ function ProjectForm({
 
 export default function Projects() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [editing, setEditing] = useState<Project | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -189,7 +191,7 @@ export default function Projects() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((p) => (
-            <Card key={p.id}>
+            <Card key={p.id} className="cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all" onClick={() => navigate(`/projects/${p.id}`)}>
               <CardHeader className="flex flex-row items-start justify-between pb-2">
                 <div className="flex items-center gap-2">
                   <div
@@ -203,7 +205,7 @@ export default function Projects() {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
-                    onClick={() => setEditing(p)}
+                    onClick={(e) => { e.stopPropagation(); setEditing(p); }}
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
@@ -211,7 +213,7 @@ export default function Projects() {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-destructive"
-                    onClick={() => deleteMutation.mutate(p.id)}
+                    onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(p.id); }}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>

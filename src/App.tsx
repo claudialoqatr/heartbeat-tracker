@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import DashboardLayout from "./components/DashboardLayout";
 import Index from "./pages/Index";
 import Projects from "./pages/Projects";
+import ProjectDetail from "./pages/ProjectDetail";
 import Unallocated from "./pages/Unallocated";
 import FocusScore from "./pages/FocusScore";
 import Reports from "./pages/Reports";
@@ -24,6 +25,7 @@ const App = () => (
           <Route element={<DashboardLayout />}>
             <Route path="/" element={<Index />} />
             <Route path="/projects" element={<Projects />} />
+            <Route path="/projects/:id" element={<ProjectDetail />} />
             <Route path="/unallocated" element={<Unallocated />} />
             <Route path="/focus" element={<FocusScore />} />
             <Route path="/reports" element={<Reports />} />
