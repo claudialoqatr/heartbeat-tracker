@@ -28,9 +28,10 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
   const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
   const FUNCTION_URL = SUPABASE_URL + '/functions/v1/log-heartbeat';
 
-  let lastActivity = 0;
+  let lastActivity = Date.now();
   let lastSent = 0;
   let selectorCache = null;
+  let lastActivityLog = 0;
 
   const domain = window.location.hostname;
 
@@ -48,7 +49,7 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
       });
       selectorCache = resp;
       return selectorCache;
-    } catch(e) { console.error('Selector fetch failed', e); return null; }
+    } catch(e) { console.error('[TimeTracker] Selector fetch failed', e); return null; }
   }
 
   function getDocId(selector) {
@@ -65,8 +66,14 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 
   async function sendHeartbeat() {
     const now = Date.now();
-    if (now - lastSent < 60000) return; // At most once per minute
-    if (now - lastActivity > 120000) return; // No activity for 2 min
+    if (now - lastSent < 60000) {
+      console.log('[TimeTracker] Heartbeat skipped: too soon (' + Math.round((now - lastSent)/1000) + 's ago)');
+      return;
+    }
+    if (now - lastActivity > 120000) {
+      console.log('[TimeTracker] Heartbeat skipped: inactivity (' + Math.round((now - lastActivity)/1000) + 's)');
+      return;
+    }
 
     const selector = await fetchSelector();
     const doc_identifier = getDocId(selector);
@@ -83,11 +90,28 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
         data: JSON.stringify({ doc_identifier, title, domain }),
       });
       lastSent = now;
-    } catch(e) { console.error('Heartbeat failed', e); }
+      console.log('[TimeTracker] Heartbeat sent for', title, '(' + domain + ')');
+    } catch(e) { console.error('[TimeTracker] Heartbeat failed', e); }
   }
 
-  ['mousemove','keydown','click','scroll'].forEach(evt => {
-    document.addEventListener(evt, () => { lastActivity = Date.now(); }, { passive: true });
+  function markActive() {
+    lastActivity = Date.now();
+    const now = Date.now();
+    if (now - lastActivityLog > 10000) {
+      console.log('[TimeTracker] Activity detected');
+      lastActivityLog = now;
+    }
+  }
+
+  ['mousemove','keydown','click'].forEach(evt => {
+    document.addEventListener(evt, markActive, { passive: true });
+  });
+  document.addEventListener('scroll', markActive, { capture: true, passive: true });
+  ['touchstart','touchmove'].forEach(evt => {
+    document.addEventListener(evt, markActive, { passive: true });
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) markActive();
   });
 
   setInterval(sendHeartbeat, 30000); // Check every 30s
