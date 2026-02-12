@@ -1,17 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Copy, CheckCircle, ExternalLink, Zap, Loader2, Key, AlertTriangle } from "lucide-react";
+import { Copy, CheckCircle, ExternalLink, Zap, Loader2, Key, AlertTriangle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 // @name         GSuite Time Tracker Heartbeat
 // @namespace    timetracker
-// @version      1.2
+// @version      2.0
 // @description  Sends activity heartbeats to your Time Tracker backend
 // @match        https://docs.google.com/*
 // @match        https://meet.google.com/*
@@ -25,6 +25,9 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 // @match        https://lucid.app/lucidchart/*
 // @match        https://notebooklm.google.com/notebook/*
 // @grant        GM_xmlhttpRequest
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_notification
 // @connect      *.supabase.co
 // @noframes
 // ==/UserScript==
@@ -35,14 +38,14 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
   // Skip if running inside an iframe
   if (window.top !== window.self) return;
 
-  // Skip known Google Docs system/background URLs
+  // Skip known system/background URLs
   const junkPaths = ['/offline/', '/_/', '/robots.txt'];
   if (junkPaths.some(p => window.location.pathname.startsWith(p))) {
     console.log('[TimeTracker] Skipped system URL:', window.location.pathname);
     return;
   }
 
-  // ⚠️ REPLACE THESE WITH YOUR VALUES
+  // ⚠️ REPLACED AUTOMATICALLY — do not edit
   const SUPABASE_URL = 'YOUR_SUPABASE_URL';
   const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
   const API_KEY = 'YOUR_API_KEY';
@@ -55,25 +58,18 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 
   const domain = window.location.hostname;
 
-function getActiveUserEmail() {
-  // 1. Check for specific NotebookLM/Gemini attribute
-  const dataEmail = document.querySelector('[data-email]');
-  if (dataEmail) return dataEmail.getAttribute('data-email');
-
-  // 2. Standard GSuite Header
-  const gsuite = document.querySelector('a[href^="https://accounts.google.com/SignOutOptions"] div:last-child');
-  if (gsuite?.innerText?.includes('@')) return gsuite.innerText.trim();
-
-  // 3. NotebookLM Specific Fallback: Target the profile button aria-label or tooltip
-  const profileBtn = document.querySelector('button[aria-label*="@"], img[aria-label*="@"]');
-  if (profileBtn) {
-    const emailMatch = profileBtn.getAttribute('aria-label').match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-    if (emailMatch) return emailMatch[0];
+  // ── Identity via GM storage (synced from Dashboard) ──
+  function getSyncedEmail() {
+    return GM_getValue('synced_user_email', null);
   }
 
-  console.warn('[TimeTracker] Could not detect Google account email.');
-  return null;
-}
+  // Listen for identity broadcast from the Dashboard page
+  window.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'TIMETRACKER_SYNC_EMAIL' && event.data.email) {
+      GM_setValue('synced_user_email', event.data.email);
+      console.log('[TimeTracker] Identity synced:', event.data.email);
+    }
+  });
 
   async function fetchSelector() {
     if (selectorCache) return selectorCache;
@@ -125,9 +121,14 @@ function getActiveUserEmail() {
       return;
     }
 
-    const email = getActiveUserEmail();
+    const email = getSyncedEmail();
     if (!email) {
-      console.warn('[TimeTracker] Heartbeat skipped: no email detected. Ensure your Google account is visible on this page.');
+      console.warn('[TimeTracker] No synced identity. Please open your Dashboard Setup page once to sync your account.');
+      GM_notification({
+        text: 'Please open your Time Tracker Dashboard once to sync your account.',
+        title: 'Time Tracker',
+        timeout: 5000,
+      });
       return;
     }
 
@@ -172,13 +173,19 @@ function getActiveUserEmail() {
     if (!document.hidden) markActive();
   });
 
-  setInterval(sendHeartbeat, 30000); // Check every 30s
-  console.log('[TimeTracker] Heartbeat script loaded for', domain);
+  setInterval(sendHeartbeat, 30000);
+  console.log('[TimeTracker] Heartbeat script v2.0 loaded for', domain);
+  if (getSyncedEmail()) {
+    console.log('[TimeTracker] Synced identity:', getSyncedEmail());
+  } else {
+    console.warn('[TimeTracker] No synced identity yet. Open your Dashboard to sync.');
+  }
 })();`;
 
 export default function Setup() {
   const [copied, setCopied] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  const [synced, setSynced] = useState(false);
   const { user } = useAuth();
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -202,6 +209,22 @@ export default function Setup() {
       return data;
     },
   });
+
+  // Auto-broadcast identity on page load so the Tampermonkey script can pick it up
+  useEffect(() => {
+    if (user?.email) {
+      window.postMessage({ type: "TIMETRACKER_SYNC_EMAIL", email: user.email }, "*");
+    }
+  }, [user?.email]);
+
+  const syncIdentity = () => {
+    if (user?.email) {
+      window.postMessage({ type: "TIMETRACKER_SYNC_EMAIL", email: user.email }, "*");
+      setSynced(true);
+      toast.success("Identity broadcast sent! If the script is installed, it will pick it up.");
+      setTimeout(() => setSynced(false), 3000);
+    }
+  };
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -299,9 +322,40 @@ export default function Setup() {
           </CardContent>
         </Card>
 
+        {/* Sync Identity card */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>3. Test Connection</CardTitle>
+            <CardTitle>3. Sync Your Identity</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!user?.email}
+              onClick={syncIdentity}
+            >
+              {synced ? (
+                <>
+                  <CheckCircle className="h-3.5 w-3.5 mr-1 text-accent" /> Synced
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 mr-1" /> Sync Identity
+                </>
+              )}
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              This broadcasts your email (<code className="text-xs bg-muted px-1 rounded">{user?.email || "…"}</code>) to the Tampermonkey script via <code className="text-xs bg-muted px-1 rounded">GM_setValue</code>. It happens automatically on page load, but you can also trigger it manually.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Once synced, the script remembers your identity permanently — no site-specific email scraping needed.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>4. Test Connection</CardTitle>
             <Button
               variant="outline"
               size="sm"
@@ -362,21 +416,21 @@ export default function Setup() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              The tracker uses an <strong>identity handshake</strong> — heartbeats are only recorded when the Google
-              account active in your browser matches the email you signed up with ({user?.email || "your account email"}
-              ).
+              The tracker uses an <strong>identity handshake</strong> — your email is synced once from this dashboard
+              and stored in the script's private memory. Heartbeats are only accepted when this synced email matches
+              your account ({user?.email || "your account email"}).
             </p>
             <div className="text-sm text-muted-foreground space-y-1">
               <p className="font-medium text-foreground">Common issues:</p>
               <ul className="list-disc list-inside space-y-1">
                 <li>
-                  You're logged into a different Google account than{" "}
-                  <code className="text-xs bg-muted px-1 rounded">{user?.email || "your signup email"}</code>
+                  You see "No synced identity" in the console — open this Setup page once with Tampermonkey active
                 </li>
-                <li>You're browsing in incognito mode (no Google account visible)</li>
                 <li>
-                  A Google UI update changed the email selectors — check the browser console for{" "}
-                  <code className="text-xs bg-muted px-1 rounded">[TimeTracker]</code> warnings
+                  You changed your account email — click "Sync Identity" above to update the script
+                </li>
+                <li>
+                  You reinstalled Tampermonkey — script storage was cleared, sync again from here
                 </li>
               </ul>
             </div>
