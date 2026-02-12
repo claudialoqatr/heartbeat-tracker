@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { format, startOfDay, endOfDay, subDays, differenceInMinutes } from "date-fns";
+import { format, startOfDay, endOfDay, subDays } from "date-fns";
 import { ArrowLeft, CalendarIcon, Clock, FileText, Globe } from "lucide-react";
 import DomainIcon from "@/components/DomainIcon";
 
@@ -53,31 +53,40 @@ export default function ProjectDetail() {
 
   const docIds = documents.map((d) => d.id);
 
-  const { data: heartbeats = [] } = useQuery({
-    queryKey: ["project-heartbeats", id, dateRange.from.toISOString(), dateRange.to.toISOString()],
+  const { data: analyticsRows = [] } = useQuery({
+    queryKey: ["project-analytics", id, dateRange.from.toISOString(), dateRange.to.toISOString()],
     queryFn: async () => {
       if (docIds.length === 0) return [];
+      const startDate = format(startOfDay(dateRange.from), "yyyy-MM-dd");
+      const endDate = format(endOfDay(dateRange.to), "yyyy-MM-dd");
       const { data, error } = await supabase
-        .from("heartbeats")
-        .select("*")
+        .from("combined_analytics" as any)
+        .select("user_id, document_id, project_id, domain, date, total_minutes")
         .in("document_id", docIds)
-        .gte("recorded_at", startOfDay(dateRange.from).toISOString())
-        .lte("recorded_at", endOfDay(dateRange.to).toISOString())
-        .order("recorded_at", { ascending: false });
+        .gte("date", startDate)
+        .lte("date", endDate);
       if (error) throw error;
-      return data;
+      return (data as unknown) as Array<{
+        user_id: string;
+        document_id: string;
+        project_id: string | null;
+        domain: string;
+        date: string;
+        total_minutes: number;
+      }>;
     },
     enabled: docIds.length > 0,
   });
 
   const stats = useMemo(() => {
-    const totalMinutes = heartbeats.length; // each heartbeat ≈ 1 min
+    let totalMinutes = 0;
     const byDoc = new Map<string, number>();
-    for (const hb of heartbeats) {
-      byDoc.set(hb.document_id, (byDoc.get(hb.document_id) || 0) + 1);
+    for (const row of analyticsRows) {
+      totalMinutes += row.total_minutes;
+      byDoc.set(row.document_id, (byDoc.get(row.document_id) || 0) + row.total_minutes);
     }
     return { totalMinutes, byDoc };
-  }, [heartbeats]);
+  }, [analyticsRows]);
 
   const formatTime = (minutes: number) => {
     if (minutes < 60) return `${minutes}m`;

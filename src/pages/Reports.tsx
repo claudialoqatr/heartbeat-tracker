@@ -59,23 +59,42 @@ export default function Reports() {
     }
   }, [period]);
 
-  const { data: heartbeats = [] } = useQuery({
-    queryKey: ["reports-heartbeats", range.start.toISOString()],
+  // Fetch project metadata for color/name lookup
+  const { data: projects = [] } = useQuery({
+    queryKey: ["all-projects"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("heartbeats")
-        .select("recorded_at, document_id, documents(project_id, projects(name, color))")
-        .gte("recorded_at", range.start.toISOString())
-        .lte("recorded_at", range.end.toISOString())
-        .order("recorded_at");
+        .from("projects")
+        .select("id, name, color");
       if (error) throw error;
-      return data as Array<{
-        recorded_at: string;
+      return data;
+    },
+  });
+
+  const projectMap = useMemo(() => {
+    const map = new Map<string, { name: string; color: string }>();
+    projects.forEach((p) => map.set(p.id, { name: p.name, color: p.color }));
+    return map;
+  }, [projects]);
+
+  const { data: analyticsRows = [] } = useQuery({
+    queryKey: ["reports-analytics", range.start.toISOString()],
+    queryFn: async () => {
+      const startDate = format(range.start, "yyyy-MM-dd");
+      const endDate = format(range.end, "yyyy-MM-dd");
+      const { data, error } = await supabase
+        .from("combined_analytics" as any)
+        .select("user_id, document_id, project_id, domain, date, total_minutes")
+        .gte("date", startDate)
+        .lte("date", endDate);
+      if (error) throw error;
+      return (data as unknown) as Array<{
+        user_id: string;
         document_id: string;
-        documents: {
-          project_id: string | null;
-          projects: { name: string; color: string } | null;
-        } | null;
+        project_id: string | null;
+        domain: string;
+        date: string;
+        total_minutes: number;
       }>;
     },
   });
@@ -85,8 +104,8 @@ export default function Reports() {
     const projectSet = new Set<string>();
     const projectTotals: Record<string, { minutes: number; color: string }> = {};
 
-    heartbeats.forEach((hb) => {
-      const d = new Date(hb.recorded_at);
+    analyticsRows.forEach((row) => {
+      const d = new Date(row.date);
       let key: string;
       switch (period) {
         case "daily":
@@ -100,15 +119,16 @@ export default function Reports() {
           break;
       }
 
-      const projName = hb.documents?.projects?.name ?? "Unallocated";
-      const projColor = hb.documents?.projects?.color ?? "#94a3b8";
+      const proj = row.project_id ? projectMap.get(row.project_id) : null;
+      const projName = proj?.name ?? "Unallocated";
+      const projColor = proj?.color ?? "#94a3b8";
       projectSet.add(projName);
 
       if (!buckets[key]) buckets[key] = {};
-      buckets[key][projName] = (buckets[key][projName] ?? 0) + 1;
+      buckets[key][projName] = (buckets[key][projName] ?? 0) + row.total_minutes;
 
       if (!projectTotals[projName]) projectTotals[projName] = { minutes: 0, color: projColor };
-      projectTotals[projName].minutes++;
+      projectTotals[projName].minutes += row.total_minutes;
     });
 
     const projectNames = Array.from(projectSet);
@@ -117,19 +137,21 @@ export default function Reports() {
       ...projects,
     }));
 
-    const totalMinutes = heartbeats.length || 1;
+    const totalMinutes = projectTotals
+      ? Object.values(projectTotals).reduce((s, v) => s + v.minutes, 0)
+      : 1;
     const tableData = Object.entries(projectTotals)
       .sort((a, b) => b[1].minutes - a[1].minutes)
       .map(([name, { minutes, color }]) => ({
         name,
         minutes,
         hours: (minutes / 60).toFixed(1),
-        percent: Math.round((minutes / totalMinutes) * 100),
+        percent: Math.round((minutes / (totalMinutes || 1)) * 100),
         color,
       }));
 
     return { chartData, tableData, projectNames };
-  }, [heartbeats, period]);
+  }, [analyticsRows, period, projectMap]);
 
   return (
     <div>
