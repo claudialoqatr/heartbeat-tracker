@@ -80,6 +80,13 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
     return el?.textContent?.trim() || document.title;
   }
 
+  function buildUrl(selector, docId) {
+    if (selector?.url_template) {
+      return selector.url_template.replace('{id}', docId);
+    }
+    return window.location.href;
+  }
+
   async function sendHeartbeat() {
     const now = Date.now();
     if (now - lastSent < 60000) {
@@ -94,6 +101,7 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
     const selector = await fetchSelector();
     const doc_identifier = getDocId(selector);
     const title = getTitle(selector);
+    const url = buildUrl(selector, doc_identifier);
 
     try {
       GM_xmlhttpRequest({
@@ -103,7 +111,7 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
           'Content-Type': 'application/json',
           'apikey': SUPABASE_ANON_KEY,
         },
-        data: JSON.stringify({ doc_identifier, title, domain, url: window.location.href }),
+        data: JSON.stringify({ doc_identifier, title, domain, url }),
       });
       lastSent = now;
       console.log('[TimeTracker] Heartbeat sent for', title, '(' + domain + ')');
