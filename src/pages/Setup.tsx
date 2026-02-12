@@ -55,24 +55,25 @@ const TAMPERMONKEY_SCRIPT = `// ==UserScript==
 
   const domain = window.location.hostname;
 
-  function getActiveUserEmail() {
-    // GSuite primary
-    const gsuite = document.querySelector(
-      'a[href^="https://accounts.google.com/SignOutOptions"] div:last-child'
-    );
-    if (gsuite?.innerText?.includes('@')) return gsuite.innerText.trim();
+function getActiveUserEmail() {
+  // 1. Check for specific NotebookLM/Gemini attribute
+  const dataEmail = document.querySelector('[data-email]');
+  if (dataEmail) return dataEmail.getAttribute('data-email');
 
-    // GSuite fallback (new UI)
-    const fallback = document.querySelector('.gb_d.gb_wa.gb_A');
-    if (fallback?.innerText?.includes('@')) return fallback.innerText.trim();
+  // 2. Standard GSuite Header
+  const gsuite = document.querySelector('a[href^="https://accounts.google.com/SignOutOptions"] div:last-child');
+  if (gsuite?.innerText?.includes('@')) return gsuite.innerText.trim();
 
-    // Gemini profile
-    const gemini = document.querySelector('[data-email]');
-    if (gemini) return gemini.getAttribute('data-email');
-
-    console.warn('[TimeTracker] Could not detect Google account email. Heartbeat will be skipped.');
-    return null;
+  // 3. NotebookLM Specific Fallback: Target the profile button aria-label or tooltip
+  const profileBtn = document.querySelector('button[aria-label*="@"], img[aria-label*="@"]');
+  if (profileBtn) {
+    const emailMatch = profileBtn.getAttribute('aria-label').match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    if (emailMatch) return emailMatch[0];
   }
+
+  console.warn('[TimeTracker] Could not detect Google account email.');
+  return null;
+}
 
   async function fetchSelector() {
     if (selectorCache) return selectorCache;
