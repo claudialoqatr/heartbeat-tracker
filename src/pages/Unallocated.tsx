@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import DomainIcon from "@/components/DomainIcon";
+import TagSelect from "@/components/TagSelect";
+import TagBadge from "@/components/TagBadge";
 
 export default function Unallocated() {
   const qc = useQueryClient();
@@ -42,11 +44,23 @@ export default function Unallocated() {
     },
   });
 
+  const { data: allTags = [] } = useQuery({
+    queryKey: ["all-tags"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tags")
+        .select("id, name, clockify_url, project_id")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const assignMutation = useMutation({
     mutationFn: async ({ docId, projectId }: { docId: string; projectId: string }) => {
       const { error } = await supabase
         .from("documents")
-        .update({ project_id: projectId })
+        .update({ project_id: projectId, tag_id: null })
         .eq("id", docId);
       if (error) throw error;
     },
@@ -54,6 +68,20 @@ export default function Unallocated() {
       qc.invalidateQueries({ queryKey: ["unallocated-docs"] });
       qc.invalidateQueries({ queryKey: ["dashboard-unallocated"] });
       toast.success("Document assigned");
+    },
+  });
+
+  const updateTagMutation = useMutation({
+    mutationFn: async ({ docId, tagId }: { docId: string; tagId: string | null }) => {
+      const { error } = await supabase
+        .from("documents")
+        .update({ tag_id: tagId })
+        .eq("id", docId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["unallocated-docs"] });
+      toast.success("Tag updated");
     },
   });
 
@@ -95,19 +123,24 @@ export default function Unallocated() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {docs.map((doc) => (
+          {docs.map((doc) => {
+            const docTag = doc.tag_id ? allTags.find((t) => t.id === doc.tag_id) : null;
+            return (
             <Card key={doc.id}>
               <CardContent className="flex items-center justify-between py-4">
                 <div className="min-w-0 flex-1">
-                  {doc.url ? (
-                    <a href={doc.url} target="_blank" rel="noopener noreferrer" className="font-medium truncate hover:underline text-primary">
-                      {doc.title || doc.doc_identifier}
-                    </a>
-                  ) : (
-                    <p className="font-medium truncate">
-                      {doc.title || doc.doc_identifier}
-                    </p>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {doc.url ? (
+                      <a href={doc.url} target="_blank" rel="noopener noreferrer" className="font-medium truncate hover:underline text-primary">
+                        {doc.title || doc.doc_identifier}
+                      </a>
+                    ) : (
+                      <p className="font-medium truncate">
+                        {doc.title || doc.doc_identifier}
+                      </p>
+                    )}
+                    {docTag && <TagBadge name={docTag.name} clockifyUrl={docTag.clockify_url} />}
+                  </div>
                   <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
                     <DomainIcon domain={doc.domain} size={14} />
                     {doc.domain} · {new Date(doc.created_at).toLocaleDateString()}
@@ -136,6 +169,11 @@ export default function Unallocated() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <TagSelect
+                    projectId={doc.project_id}
+                    value={doc.tag_id}
+                    onValueChange={(tagId) => updateTagMutation.mutate({ docId: doc.id, tagId })}
+                  />
                   <Button
                     variant="ghost"
                     size="icon"
@@ -148,7 +186,8 @@ export default function Unallocated() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

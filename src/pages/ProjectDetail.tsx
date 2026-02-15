@@ -15,9 +15,15 @@ import { cn } from "@/lib/utils";
 import { format, startOfDay, endOfDay, subDays } from "date-fns";
 import { ArrowLeft, CalendarIcon, Clock, FileText, Globe } from "lucide-react";
 import DomainIcon from "@/components/DomainIcon";
+import TagManager from "@/components/TagManager";
+import TagSelect from "@/components/TagSelect";
+import TagBadge from "@/components/TagBadge";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
+  const qc = useQueryClient();
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: subDays(new Date(), 7),
     to: new Date(),
@@ -49,6 +55,36 @@ export default function ProjectDetail() {
       return data;
     },
     enabled: !!id,
+  });
+
+  const { data: tags = [] } = useQuery({
+    queryKey: ["tags", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tags")
+        .select("id, name, clockify_url")
+        .eq("project_id", id!)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
+  const tagMap = useMemo(() => new Map(tags.map((t) => [t.id, t])), [tags]);
+
+  const updateTagMutation = useMutation({
+    mutationFn: async ({ docId, tagId }: { docId: string; tagId: string | null }) => {
+      const { error } = await supabase
+        .from("documents")
+        .update({ tag_id: tagId })
+        .eq("id", docId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["project-docs", id] });
+      toast.success("Tag updated");
+    },
   });
 
   const docIds = documents.map((d) => d.id);
@@ -210,6 +246,11 @@ export default function ProjectDetail() {
         </Card>
       </div>
 
+      {/* Tag Manager */}
+      <div className="mb-8">
+        <TagManager projectId={id!} />
+      </div>
+
       {/* Document list with time */}
       <h2 className="text-lg font-semibold mb-3">Documents</h2>
       {documents.length === 0 ? (
@@ -228,19 +269,23 @@ export default function ProjectDetail() {
                 stats.totalMinutes > 0
                   ? Math.round((mins / stats.totalMinutes) * 100)
                   : 0;
+              const docTag = doc.tag_id ? tagMap.get(doc.tag_id) : null;
               return (
                 <Card key={doc.id}>
                   <CardContent className="flex items-center justify-between py-4">
                     <div className="min-w-0 flex-1">
-                      {doc.url ? (
-                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="font-medium truncate hover:underline text-primary">
-                          {doc.title || doc.doc_identifier}
-                        </a>
-                      ) : (
-                        <p className="font-medium truncate">
-                          {doc.title || doc.doc_identifier}
-                        </p>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {doc.url ? (
+                          <a href={doc.url} target="_blank" rel="noopener noreferrer" className="font-medium truncate hover:underline text-primary">
+                            {doc.title || doc.doc_identifier}
+                          </a>
+                        ) : (
+                          <p className="font-medium truncate">
+                            {doc.title || doc.doc_identifier}
+                          </p>
+                        )}
+                        {docTag && <TagBadge name={docTag.name} clockifyUrl={docTag.clockify_url} />}
+                      </div>
                       <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
                         <DomainIcon domain={doc.domain} size={14} />
                         {doc.domain} · Last active{" "}
@@ -248,6 +293,11 @@ export default function ProjectDetail() {
                       </p>
                     </div>
                     <div className="flex items-center gap-4 ml-4 shrink-0">
+                      <TagSelect
+                        projectId={id!}
+                        value={doc.tag_id}
+                        onValueChange={(tagId) => updateTagMutation.mutate({ docId: doc.id, tagId })}
+                      />
                       <div className="text-right">
                         <p className="font-semibold">{formatTime(mins)}</p>
                         <p className="text-xs text-muted-foreground">{pct}%</p>
