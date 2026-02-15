@@ -65,8 +65,6 @@ export type Database = {
           updated_at: string;
           url: string | null;
           user_id: string | null;
-          // Add this to the documents Row, Insert, and Update types in types.ts
-          clockify_tag: string | null;
         };
         Insert: {
           auto_tagged?: boolean;
@@ -79,7 +77,6 @@ export type Database = {
           updated_at?: string;
           url?: string | null;
           user_id?: string | null;
-          clockify_tag: string | null;
         };
         Update: {
           auto_tagged?: boolean;
@@ -92,7 +89,6 @@ export type Database = {
           updated_at?: string;
           url?: string | null;
           user_id?: string | null;
-          clockify_tag: string | null;
         };
         Relationships: [
           {
