@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, CheckSquare } from "lucide-react";
+import { Trash2, CheckSquare, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import DomainIcon from "@/components/DomainIcon";
 import TagSelect from "@/components/TagSelect";
