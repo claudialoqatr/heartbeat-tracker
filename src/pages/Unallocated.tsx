@@ -145,6 +145,37 @@ export default function Unallocated() {
     },
   });
 
+  const autoAssignMutation = useMutation({
+    mutationFn: async () => {
+      let assigned = 0;
+      for (const doc of docs) {
+        const title = (doc.title || doc.doc_identifier || "").toLowerCase();
+        const domain = (doc.domain || "").toLowerCase();
+        const matchedProject = projects.find((p) =>
+          p.keywords?.some((kw: string) => {
+            const lkw = kw.toLowerCase();
+            return title.includes(lkw) || domain.includes(lkw);
+          })
+        );
+        if (matchedProject) {
+          const { error } = await supabase
+            .from("documents")
+            .update({ project_id: matchedProject.id, tag_id: null })
+            .eq("id", doc.id);
+          if (error) throw error;
+          assigned++;
+        }
+      }
+      return assigned;
+    },
+    onSuccess: (count) => {
+      qc.invalidateQueries({ queryKey: ["unallocated-docs"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-unallocated"] });
+      toast.success(`Auto-assigned ${count} document${count !== 1 ? "s" : ""}`);
+    },
+    onError: () => toast.error("Auto-assign failed"),
+  });
+
   const toggle = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -166,7 +197,18 @@ export default function Unallocated() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Unallocated Work</h1>
-        <Badge variant="secondary">{docs.length} docs</Badge>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => autoAssignMutation.mutate()}
+            disabled={autoAssignMutation.isPending || docs.length === 0}
+          >
+            <Wand2 className="h-4 w-4 mr-1.5" />
+            {autoAssignMutation.isPending ? "Scanning…" : "Auto-assign"}
+          </Button>
+          <Badge variant="secondary">{docs.length} docs</Badge>
+        </div>
       </div>
 
       {/* Bulk action bar */}
