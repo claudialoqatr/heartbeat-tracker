@@ -40,7 +40,7 @@ export default function Unallocated() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("projects")
-        .select("id, name, color")
+        .select("id, name, color, keywords")
         .order("name");
       if (error) throw error;
       return data;
