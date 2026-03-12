@@ -3,6 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Table,
   TableBody,
@@ -33,6 +40,9 @@ import {
   subWeeks,
   subMonths,
 } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { DateRange } from "react-day-picker";
 
 type Period = "daily" | "weekly" | "monthly";
 
@@ -46,8 +56,15 @@ const COLORS = [
 
 export default function Reports() {
   const [period, setPeriod] = useState<Period>("daily");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   const range = useMemo(() => {
+    if (dateRange?.from) {
+      return {
+        start: startOfDay(dateRange.from),
+        end: dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from),
+      };
+    }
     const now = new Date();
     switch (period) {
       case "daily":
@@ -57,8 +74,7 @@ export default function Reports() {
       case "monthly":
         return { start: subMonths(startOfMonth(now), 5), end: endOfMonth(now) };
     }
-  }, [period]);
-
+  }, [period, dateRange]);
   // Fetch project metadata for color/name lookup
   const { data: projects = [] } = useQuery({
     queryKey: ["all-projects"],
