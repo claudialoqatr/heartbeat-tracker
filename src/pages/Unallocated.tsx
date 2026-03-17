@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, CheckSquare, Wand2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Trash2, CheckSquare, Wand2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import DomainIcon from "@/components/DomainIcon";
 import TagSelect from "@/components/TagSelect";
@@ -21,6 +22,8 @@ import TagBadge from "@/components/TagBadge";
 export default function Unallocated() {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+  const [domainFilter, setDomainFilter] = useState<string>("all");
 
   const { data: docs = [], isLoading } = useQuery({
     queryKey: ["unallocated-docs"],
@@ -58,6 +61,28 @@ export default function Unallocated() {
       return data;
     },
   });
+
+  const domains = useMemo(() => {
+    const set = new Set(docs.map((d) => d.domain));
+    return Array.from(set).sort();
+  }, [docs]);
+
+  const filteredDocs = useMemo(() => {
+    let result = docs;
+    if (domainFilter !== "all") {
+      result = result.filter((d) => d.domain === domainFilter);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (d) =>
+          (d.title || "").toLowerCase().includes(q) ||
+          (d.doc_identifier || "").toLowerCase().includes(q) ||
+          (d.domain || "").toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [docs, search, domainFilter]);
 
   const assignMutation = useMutation({
     mutationFn: async ({ docId, projectId }: { docId: string; projectId: string }) => {
@@ -185,12 +210,12 @@ export default function Unallocated() {
     });
   };
 
-  const allSelected = docs.length > 0 && selected.size === docs.length;
+  const allSelected = filteredDocs.length > 0 && filteredDocs.every((d) => selected.has(d.id));
   const someSelected = selected.size > 0;
 
   const toggleAll = () => {
     if (allSelected) setSelected(new Set());
-    else setSelected(new Set(docs.map((d) => d.id)));
+    else setSelected(new Set(filteredDocs.map((d) => d.id)));
   };
 
   return (
@@ -207,8 +232,47 @@ export default function Unallocated() {
             <Wand2 className="h-4 w-4 mr-1.5" />
             {autoAssignMutation.isPending ? "Scanning…" : "Auto-assign"}
           </Button>
-          <Badge variant="secondary">{docs.length} docs</Badge>
+          <Badge variant="secondary">{filteredDocs.length} / {docs.length} docs</Badge>
         </div>
+      </div>
+
+      {/* Search & filter bar */}
+      <div className="flex items-center gap-2 mb-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search documents…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 h-9"
+          />
+          {search && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+              onClick={() => setSearch("")}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+        <Select value={domainFilter} onValueChange={setDomainFilter}>
+          <SelectTrigger className="w-52 h-9">
+            <SelectValue placeholder="All domains" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All domains</SelectItem>
+            {domains.map((d) => (
+              <SelectItem key={d} value={d}>
+                <div className="flex items-center gap-2">
+                  <DomainIcon domain={d} size={14} />
+                  {d}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Bulk action bar */}
@@ -260,6 +324,12 @@ export default function Unallocated() {
             🎉 All documents are assigned to projects!
           </CardContent>
         </Card>
+      ) : filteredDocs.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            No documents match your filters.
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-3">
           {/* Select all row */}
@@ -268,10 +338,10 @@ export default function Unallocated() {
               checked={allSelected}
               onCheckedChange={toggleAll}
             />
-            <span className="text-xs text-muted-foreground">Select all</span>
+            <span className="text-xs text-muted-foreground">Select all ({filteredDocs.length})</span>
           </div>
 
-          {docs.map((doc) => {
+          {filteredDocs.map((doc) => {
             const docTag = doc.tag_id ? allTags.find((t) => t.id === doc.tag_id) : null;
             const isSelected = selected.has(doc.id);
             return (
