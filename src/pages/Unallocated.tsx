@@ -62,6 +62,28 @@ export default function Unallocated() {
     },
   });
 
+  const domains = useMemo(() => {
+    const set = new Set(docs.map((d) => d.domain));
+    return Array.from(set).sort();
+  }, [docs]);
+
+  const filteredDocs = useMemo(() => {
+    let result = docs;
+    if (domainFilter !== "all") {
+      result = result.filter((d) => d.domain === domainFilter);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (d) =>
+          (d.title || "").toLowerCase().includes(q) ||
+          (d.doc_identifier || "").toLowerCase().includes(q) ||
+          (d.domain || "").toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [docs, search, domainFilter]);
+
   const assignMutation = useMutation({
     mutationFn: async ({ docId, projectId }: { docId: string; projectId: string }) => {
       const { error } = await supabase
