@@ -40,8 +40,9 @@ import {
   subWeeks,
   subMonths,
 } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import TagBadge from "@/components/TagBadge";
 import type { DateRange } from "react-day-picker";
 
 type Period = "daily" | "weekly" | "monthly";
@@ -57,6 +58,16 @@ const COLORS = [
 export default function Reports() {
   const [period, setPeriod] = useState<Period>("daily");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+
+  const toggleProject = (name: string) => {
+    setExpandedProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
 
   const range = useMemo(() => {
     if (dateRange?.from) {
@@ -75,7 +86,7 @@ export default function Reports() {
         return { start: subMonths(startOfMonth(now), 5), end: endOfMonth(now) };
     }
   }, [period, dateRange]);
-  // Fetch project metadata for color/name lookup
+
   const { data: projects = [] } = useQuery({
     queryKey: ["all-projects"],
     queryFn: async () => {
@@ -115,10 +126,60 @@ export default function Reports() {
     },
   });
 
+  // Fetch documents for title/tag info
+  const docIds = useMemo(
+    () => [...new Set(analyticsRows.map((r) => r.document_id))],
+    [analyticsRows]
+  );
+
+  const { data: documents = [] } = useQuery({
+    queryKey: ["reports-documents", docIds],
+    enabled: docIds.length > 0,
+    queryFn: async () => {
+      // Supabase has a 1000 row limit, batch if needed
+      const results: Array<{ id: string; title: string | null; tag_id: string | null; domain: string }> = [];
+      for (let i = 0; i < docIds.length; i += 500) {
+        const batch = docIds.slice(i, i + 500);
+        const { data, error } = await supabase
+          .from("documents")
+          .select("id, title, tag_id, domain")
+          .in("id", batch);
+        if (error) throw error;
+        results.push(...(data ?? []));
+      }
+      return results;
+    },
+  });
+
+  const { data: tags = [] } = useQuery({
+    queryKey: ["reports-tags"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tags")
+        .select("id, name, clockify_url");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const docMap = useMemo(() => {
+    const map = new Map<string, { title: string | null; tag_id: string | null; domain: string }>();
+    documents.forEach((d) => map.set(d.id, { title: d.title, tag_id: d.tag_id, domain: d.domain }));
+    return map;
+  }, [documents]);
+
+  const tagMap = useMemo(() => {
+    const map = new Map<string, { name: string; clockify_url: string | null }>();
+    tags.forEach((t) => map.set(t.id, { name: t.name, clockify_url: t.clockify_url }));
+    return map;
+  }, [tags]);
+
   const { chartData, tableData, projectNames } = useMemo(() => {
     const buckets: Record<string, Record<string, number>> = {};
     const projectSet = new Set<string>();
-    const projectTotals: Record<string, { minutes: number; color: string }> = {};
+    const projectTotals: Record<string, { minutes: number; color: string; projectId: string | null }> = {};
+    // Per-project, per-document breakdown
+    const projectDocs: Record<string, Record<string, number>> = {};
 
     analyticsRows.forEach((row) => {
       const d = new Date(row.date);
@@ -143,8 +204,13 @@ export default function Reports() {
       if (!buckets[key]) buckets[key] = {};
       buckets[key][projName] = (buckets[key][projName] ?? 0) + row.total_minutes;
 
-      if (!projectTotals[projName]) projectTotals[projName] = { minutes: 0, color: projColor };
+      if (!projectTotals[projName])
+        projectTotals[projName] = { minutes: 0, color: projColor, projectId: row.project_id };
       projectTotals[projName].minutes += row.total_minutes;
+
+      if (!projectDocs[projName]) projectDocs[projName] = {};
+      projectDocs[projName][row.document_id] =
+        (projectDocs[projName][row.document_id] ?? 0) + row.total_minutes;
     });
 
     const projectNames = Array.from(projectSet);
@@ -153,21 +219,32 @@ export default function Reports() {
       ...projects,
     }));
 
-    const totalMinutes = projectTotals
-      ? Object.values(projectTotals).reduce((s, v) => s + v.minutes, 0)
-      : 1;
+    const totalMinutes = Object.values(projectTotals).reduce((s, v) => s + v.minutes, 0) || 1;
     const tableData = Object.entries(projectTotals)
       .sort((a, b) => b[1].minutes - a[1].minutes)
       .map(([name, { minutes, color }]) => ({
         name,
         minutes,
         hours: (minutes / 60).toFixed(1),
-        percent: Math.round((minutes / (totalMinutes || 1)) * 100),
+        percent: Math.round((minutes / totalMinutes) * 100),
         color,
+        docs: Object.entries(projectDocs[name] || {})
+          .map(([docId, mins]) => {
+            const doc = docMap.get(docId);
+            const tag = doc?.tag_id ? tagMap.get(doc.tag_id) : null;
+            return {
+              docId,
+              title: doc?.title || doc?.domain || docId,
+              tag: tag ?? null,
+              minutes: mins,
+              hours: (mins / 60).toFixed(1),
+            };
+          })
+          .sort((a, b) => b.minutes - a.minutes),
       }));
 
     return { chartData, tableData, projectNames };
-  }, [analyticsRows, period, projectMap]);
+  }, [analyticsRows, period, projectMap, docMap, tagMap]);
 
   return (
     <div>
@@ -281,22 +358,55 @@ export default function Reports() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tableData.map((row) => (
-                  <TableRow key={row.name}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="h-2.5 w-2.5 rounded-full"
-                          style={{ backgroundColor: row.color }}
-                        />
-                        {row.name}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">{row.minutes}</TableCell>
-                    <TableCell className="text-right">{row.hours}</TableCell>
-                    <TableCell className="text-right">{row.percent}%</TableCell>
-                  </TableRow>
-                ))}
+                {tableData.map((row) => {
+                  const isExpanded = expandedProjects.has(row.name);
+                  return (
+                    <>
+                      <TableRow
+                        key={row.name}
+                        className="cursor-pointer"
+                        onClick={() => toggleProject(row.name)}
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                            )}
+                            <div
+                              className="h-2.5 w-2.5 rounded-full shrink-0"
+                              style={{ backgroundColor: row.color }}
+                            />
+                            {row.name}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">{row.minutes}</TableCell>
+                        <TableCell className="text-right">{row.hours}</TableCell>
+                        <TableCell className="text-right">{row.percent}%</TableCell>
+                      </TableRow>
+                      {isExpanded &&
+                        row.docs.map((doc) => (
+                          <TableRow key={doc.docId} className="bg-muted/30">
+                            <TableCell className="pl-12">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm">{doc.title}</span>
+                                {doc.tag && (
+                                  <TagBadge
+                                    name={doc.tag.name}
+                                    clockifyUrl={doc.tag.clockify_url}
+                                  />
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right text-sm">{doc.minutes}</TableCell>
+                            <TableCell className="text-right text-sm">{doc.hours}</TableCell>
+                            <TableCell />
+                          </TableRow>
+                        ))}
+                    </>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
