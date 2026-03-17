@@ -324,6 +324,12 @@ export default function Unallocated() {
             🎉 All documents are assigned to projects!
           </CardContent>
         </Card>
+      ) : filteredDocs.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            No documents match your filters.
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-3">
           {/* Select all row */}
@@ -332,10 +338,10 @@ export default function Unallocated() {
               checked={allSelected}
               onCheckedChange={toggleAll}
             />
-            <span className="text-xs text-muted-foreground">Select all</span>
+            <span className="text-xs text-muted-foreground">Select all ({filteredDocs.length})</span>
           </div>
 
-          {docs.map((doc) => {
+          {filteredDocs.map((doc) => {
             const docTag = doc.tag_id ? allTags.find((t) => t.id === doc.tag_id) : null;
             const isSelected = selected.has(doc.id);
             return (
