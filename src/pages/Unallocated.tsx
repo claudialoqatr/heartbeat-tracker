@@ -210,12 +210,12 @@ export default function Unallocated() {
     });
   };
 
-  const allSelected = docs.length > 0 && selected.size === docs.length;
+  const allSelected = filteredDocs.length > 0 && filteredDocs.every((d) => selected.has(d.id));
   const someSelected = selected.size > 0;
 
   const toggleAll = () => {
     if (allSelected) setSelected(new Set());
-    else setSelected(new Set(docs.map((d) => d.id)));
+    else setSelected(new Set(filteredDocs.map((d) => d.id)));
   };
 
   return (
