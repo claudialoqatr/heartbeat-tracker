@@ -232,8 +232,47 @@ export default function Unallocated() {
             <Wand2 className="h-4 w-4 mr-1.5" />
             {autoAssignMutation.isPending ? "Scanning…" : "Auto-assign"}
           </Button>
-          <Badge variant="secondary">{docs.length} docs</Badge>
+          <Badge variant="secondary">{filteredDocs.length} / {docs.length} docs</Badge>
         </div>
+      </div>
+
+      {/* Search & filter bar */}
+      <div className="flex items-center gap-2 mb-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search documents…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 h-9"
+          />
+          {search && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+              onClick={() => setSearch("")}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+        <Select value={domainFilter} onValueChange={setDomainFilter}>
+          <SelectTrigger className="w-52 h-9">
+            <SelectValue placeholder="All domains" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All domains</SelectItem>
+            {domains.map((d) => (
+              <SelectItem key={d} value={d}>
+                <div className="flex items-center gap-2">
+                  <DomainIcon domain={d} size={14} />
+                  {d}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Bulk action bar */}
