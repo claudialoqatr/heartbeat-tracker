@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Trash2, CheckSquare, Wand2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Trash2, CheckSquare, Wand2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import DomainIcon from "@/components/DomainIcon";
 import TagSelect from "@/components/TagSelect";
@@ -21,6 +22,8 @@ import TagBadge from "@/components/TagBadge";
 export default function Unallocated() {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+  const [domainFilter, setDomainFilter] = useState<string>("all");
 
   const { data: docs = [], isLoading } = useQuery({
     queryKey: ["unallocated-docs"],
