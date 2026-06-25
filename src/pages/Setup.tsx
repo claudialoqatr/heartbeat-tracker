@@ -177,6 +177,7 @@ ${matchLines}
     console.warn('[TimeTracker] No synced identity yet. Open your Dashboard to sync.');
   }
 })();`;
+}
 
 export default function Setup() {
   const [copied, setCopied] = useState<string | null>(null);
