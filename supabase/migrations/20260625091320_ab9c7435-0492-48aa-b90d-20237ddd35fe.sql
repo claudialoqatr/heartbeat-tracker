@@ -1,0 +1,1 @@
+CREATE POLICY "Authenticated can view global selectors" ON public.selectors FOR SELECT TO authenticated USING (user_id IS NULL);
