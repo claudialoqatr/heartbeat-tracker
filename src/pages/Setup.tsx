@@ -8,23 +8,17 @@ import { Badge } from "@/components/ui/badge";
 import { Copy, CheckCircle, ExternalLink, Zap, Loader2, Key, AlertTriangle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
-const TAMPERMONKEY_SCRIPT = `// ==UserScript==
+const BASELINE_MATCHES = ["https://*.lovable.app/*"];
+
+function buildScript(domains: string[]) {
+  const allMatches = Array.from(new Set([...domains.map((d) => `https://${d}/*`), ...BASELINE_MATCHES]));
+  const matchLines = allMatches.map((m) => `// @match        ${m}`).join("\n");
+  return `// ==UserScript==
 // @name         GSuite Time Tracker Heartbeat
 // @namespace    timetracker
 // @version      2.0
 // @description  Sends activity heartbeats to your Time Tracker backend
-// @match        https://docs.google.com/*
-// @match        https://meet.google.com/*
-// @match        https://chatgpt.com/*
-// @match        https://gemini.google.com/*
-// @match        https://docs.google.com/spreadsheets/*
-// @match        https://docs.google.com/presentation/*
-// @match        https://www.figma.com/file/*
-// @match        https://github.com/*
-// @match        https://mail.google.com/*
-// @match        https://lucid.app/lucidchart/*
-// @match        https://notebooklm.google.com/notebook/*
-// @match        https://*.lovable.app/*
+${matchLines}
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
 // @grant        GM_getValue
