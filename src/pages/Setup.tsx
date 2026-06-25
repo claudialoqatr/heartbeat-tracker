@@ -470,13 +470,28 @@ export default function Setup() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Active Selectors</CardTitle>
+            <CardTitle>Tracked Domains & Selectors</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {selectors.map((s) => (
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              The script's <code className="text-xs bg-muted px-1 rounded">@match</code> list is generated from the
+              rows below. To track a new site, add a row to the <code className="text-xs bg-muted px-1 rounded">selectors</code>{" "}
+              table (set <code className="text-xs bg-muted px-1 rounded">user_id</code> to your account, or leave it{" "}
+              <code className="text-xs bg-muted px-1 rounded">NULL</code> to make it a global selector shared with
+              every user). User-specific selectors override global ones for the same domain.
+            </p>
+            <p className="text-sm text-foreground font-medium">
+              ⚠️ After adding a new domain, copy the updated script above and reinstall it in Tampermonkey —
+              Tampermonkey only reads the <code className="text-xs bg-muted px-1 rounded">@match</code> list at
+              install time, so existing installs won't pick up new domains automatically.
+            </p>
+            <div className="space-y-2 pt-2">
+              {selectors.map((s: any) => (
                 <div key={s.id} className="flex items-center gap-3 text-sm">
                   <Badge variant="outline">{s.domain}</Badge>
+                  {s.user_id === null && (
+                    <Badge variant="secondary" className="text-xs">global</Badge>
+                  )}
                   <code className="text-xs text-muted-foreground">{s.title_selector}</code>
                 </div>
               ))}
