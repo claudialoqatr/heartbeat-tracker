@@ -1,30 +1,33 @@
 ## Goal
-Schedule the existing `nightly-rollup` edge function to run automatically every night at 00:00 SAST, so heartbeats older than 31 days are rolled into `daily_stats` without losing reporting accuracy.
+Make adding a row to the `selectors` table actually start tracking that domain — no code edits needed.
 
-## What stays accurate
-- Hours per document are preserved. `perform_31day_rollup()` aggregates old raw heartbeats into `daily_stats` (one row per user + document + day, with `total_minutes`).
-- Reports use the `combined_analytics` view, which unions the last 31 days of raw `heartbeats` with older `daily_stats` rows, so totals remain exact.
-- No UI changes and no manual trigger button are needed.
+## Why it's broken today
+1. The Tampermonkey script has a hardcoded `@match` list in `src/pages/Setup.tsx`. Tampermonkey only injects the script on listed domains, so a DB-only addition does nothing on the new site.
+2. The selector lookup in `log-heartbeat` filters by `user_id` when an API key is present. A row inserted with `user_id = NULL` is invisible to authenticated calls.
 
-## Implementation steps
+## Changes
 
-1. **Enable required extensions**
-   - Enable `pg_cron` and `pg_net` extensions on the database. These power the scheduled HTTP call.
+### 1. Selector fetch — global fallback
+Edit `supabase/functions/log-heartbeat/index.ts` GET branch:
+- Query selectors for the domain matching either the user's `user_id` OR `user_id IS NULL`.
+- Prefer the user-specific row if both exist; otherwise return the global row.
 
-2. **Create the scheduled job**
-   - Use `cron.schedule()` with `net.http_post()` to call `https://frbbhhwzmrbznpjjhytm.supabase.co/functions/v1/nightly-rollup`.
-   - Schedule: `0 22 * * *` UTC (00:00 SAST, UTC+2).
-   - Name the job `nightly-rollup-daily`.
-   - Pass headers `Content-Type: application/json` and the project's anon API key.
-   - Run this SQL via the Supabase insert tool (not a migration), because it contains project-specific URL and key.
+### 2. Dynamic `@match` list in the userscript
+Edit `src/pages/Setup.tsx`:
+- Fetch all distinct domains from the `selectors` table (user's own + global rows) via the existing `useQuery`.
+- Generate the `// @match https://<domain>/*` block dynamically inside the script template string, replacing the hardcoded list.
+- Keep `*.lovable.app` and any baseline matches that aren't necessarily in the selectors table.
+- The "Copy script" / install flow stays the same — the displayed script body simply includes the current domain set.
 
-3. **Verify the job is registered**
-   - Query `cron.job` to confirm the schedule exists and has the expected run time.
-   - The next automatic run will confirm the function is invoked.
+### 3. Setup Guide copy update
+Short note on the Setup page explaining:
+- Adding a row in `selectors` (domain + title_selector + optional doc_id_pattern/url_template) automatically extends the script's `@match` list.
+- After adding a domain, **reinstall the userscript** (Tampermonkey caches the `@match` header at install time — DB changes alone won't re-grant page access on already-installed scripts).
+- Global selectors (`user_id` NULL) apply to everyone; user-specific selectors override them.
 
 ## Out of scope
-- No manual "Run rollup now" button in the app.
-- No changes to the rollup logic, reports, or analytics view.
+- No selector management UI (you're inserting via DB directly, as today).
+- No change to heartbeat POST logic, rollup, or schema.
 
-## Risk / note
-The first nightly run processes heartbeats older than 31 days. If there is a large backlog, the initial run may take longer than subsequent daily runs; after that, each run handles about one day's worth of newly-aged-out data.
+## Verification
+- Insert a selector row for a new domain, reinstall the script, load the page, confirm a heartbeat is written and the selector's title/doc_id rules are applied.

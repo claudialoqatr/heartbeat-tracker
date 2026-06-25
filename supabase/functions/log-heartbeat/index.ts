@@ -38,11 +38,20 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Fetch user-specific and global (user_id IS NULL) selectors; prefer user-specific.
       let query = supabase.from("selectors").select("*").eq("domain", domain);
-      if (userId) query = query.eq("user_id", userId);
-      const { data, error } = await query.maybeSingle();
+      if (userId) {
+        query = query.or(`user_id.eq.${userId},user_id.is.null`);
+      } else {
+        query = query.is("user_id", null);
+      }
+      const { data, error } = await query;
       if (error) throw error;
-      return new Response(JSON.stringify(data), {
+      const picked =
+        (data || []).find((r: any) => userId && r.user_id === userId) ||
+        (data || []).find((r: any) => r.user_id === null) ||
+        null;
+      return new Response(JSON.stringify(picked), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
