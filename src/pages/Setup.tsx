@@ -252,7 +252,9 @@ export default function Setup() {
     setTimeout(() => setCopied(null), 2000);
   };
 
-  const readyScript = TAMPERMONKEY_SCRIPT.replace("YOUR_SUPABASE_URL", supabaseUrl || "")
+  const trackedDomains = Array.from(new Set((selectors || []).map((s: any) => s.domain))).sort();
+  const readyScript = buildScript(trackedDomains)
+    .replace("YOUR_SUPABASE_URL", supabaseUrl || "")
     .replace("YOUR_ANON_KEY", anonKey || "")
     .replace("YOUR_API_KEY", profile?.api_key || "YOUR_API_KEY");
 
