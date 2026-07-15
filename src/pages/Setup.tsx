@@ -16,7 +16,7 @@ function buildScript(domains: string[]) {
   return `// ==UserScript==
 // @name         GSuite Time Tracker Heartbeat
 // @namespace    timetracker
-// @version      2.1
+// @version      2.2
 // @description  Sends activity heartbeats to your Time Tracker backend
 ${matchLines}
 // @grant        GM_xmlhttpRequest
