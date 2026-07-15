@@ -506,7 +506,9 @@ export default function Setup() {
             <p className="text-sm text-foreground font-medium">
               ⚠️ After adding a new domain, copy the updated script above and reinstall it in Tampermonkey —
               Tampermonkey only reads the <code className="text-xs bg-muted px-1 rounded">@match</code> list at
-              install time, so existing installs won't pick up new domains automatically.
+              install time, so existing installs won't pick up new domains automatically. Compound-path
+              selectors (e.g. <code className="text-xs bg-muted px-1 rounded">docs.google.com/spreadsheets</code>)
+              also require a reinstall so the new domain resolver ships to Tampermonkey.
             </p>
             <div className="space-y-2 pt-2">
               {selectors.map((s: any) => (
