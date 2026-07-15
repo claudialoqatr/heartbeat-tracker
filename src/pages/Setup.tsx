@@ -157,9 +157,17 @@ ${matchLines}
           'x-api-key': API_KEY,
         },
         data: JSON.stringify({ doc_identifier, title, domain, url, email }),
+        onload: function(r) {
+          if (r.status >= 200 && r.status < 300) {
+            lastSent = now;
+            console.log('[TimeTracker] Heartbeat sent for', title, '(' + domain + ') as', email);
+          } else {
+            console.warn('[TimeTracker] Heartbeat rejected', r.status, r.responseText);
+          }
+        },
+        onerror: function(e) { console.error('[TimeTracker] Heartbeat network error', e); },
+        ontimeout: function() { console.error('[TimeTracker] Heartbeat timed out'); },
       });
-      lastSent = now;
-      console.log('[TimeTracker] Heartbeat sent for', title, '(' + domain + ') as', email);
     } catch(e) { console.error('[TimeTracker] Heartbeat failed', e); }
   }
 
