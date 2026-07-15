@@ -16,7 +16,7 @@ function buildScript(domains: string[]) {
   return `// ==UserScript==
 // @name         GSuite Time Tracker Heartbeat
 // @namespace    timetracker
-// @version      2.0
+// @version      2.1
 // @description  Sends activity heartbeats to your Time Tracker backend
 ${matchLines}
 // @grant        GM_xmlhttpRequest
@@ -42,9 +42,9 @@ ${matchLines}
   }
 
   // ⚠️ REPLACED AUTOMATICALLY — do not edit
-  const SUPABASE_URL = 'https://frbbhhwzmrbznpjjhytm.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZyYmJoaHd6bXJiem5wampoeXRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NTQ2ODcsImV4cCI6MjA4NjMzMDY4N30.GWenyjeTiZww1aOsdzUf-oTacJYGYv1KALg3wCo0Xec';
-  const API_KEY = '82337f0a-5dcb-4d06-a9cf-9e1fa11d265d';
+  const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+  const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
+  const API_KEY = 'YOUR_API_KEY';
   const FUNCTION_URL = SUPABASE_URL + '/functions/v1/log-heartbeat';
 
   let lastActivity = Date.now();
@@ -170,7 +170,7 @@ ${matchLines}
   });
 
   setInterval(sendHeartbeat, 30000);
-  console.log('[TimeTracker] Heartbeat script v2.0 loaded for', domain);
+  console.log('[TimeTracker] Heartbeat script v2.1 loaded for', domain);
   if (getSyncedEmail()) {
     console.log('[TimeTracker] Synced identity:', getSyncedEmail());
   } else {
@@ -253,6 +253,7 @@ export default function Setup() {
   };
 
   const trackedDomains = Array.from(new Set((selectors || []).map((s: any) => s.domain))).sort();
+  const scriptReady = Boolean(supabaseUrl && anonKey && profile?.api_key);
   const readyScript = buildScript(trackedDomains)
     .replace("YOUR_SUPABASE_URL", supabaseUrl || "")
     .replace("YOUR_ANON_KEY", anonKey || "")
@@ -326,7 +327,7 @@ export default function Setup() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>2. Install the Script</CardTitle>
-            <Button variant="outline" size="sm" onClick={() => copyToClipboard(readyScript, "Script")}>
+            <Button variant="outline" size="sm" disabled={!scriptReady} onClick={() => copyToClipboard(readyScript, "Script")}>
               {copied === "Script" ? (
                 <>
                   <CheckCircle className="h-3.5 w-3.5 mr-1 text-accent" /> Copied
