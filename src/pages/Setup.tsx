@@ -52,7 +52,21 @@ ${matchLines}
   let selectorCache = null;
   let lastActivityLog = 0;
 
-  const domain = window.location.hostname;
+  // Resolve the effective domain, preferring compound-path selectors
+  // (e.g. "docs.google.com/spreadsheets") over the bare hostname.
+  const KNOWN_DOMAINS = ${JSON.stringify(domains)};
+  function resolveDomain() {
+    const host = window.location.hostname;
+    const path = window.location.pathname;
+    const matches = KNOWN_DOMAINS.filter(function(d) {
+      if (d === host) return true;
+      if (d.indexOf(host + '/') !== 0) return false;
+      const sub = d.slice(host.length); // "/spreadsheets"
+      return path === sub || path.indexOf(sub + '/') === 0;
+    }).sort(function(a, b) { return b.length - a.length; });
+    return matches[0] || host;
+  }
+  const domain = resolveDomain();
 
   // ── Identity via GM storage (synced from Dashboard) ──
   function getSyncedEmail() {
