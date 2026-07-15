@@ -192,7 +192,7 @@ ${matchLines}
   });
 
   setInterval(sendHeartbeat, 30000);
-  console.log('[TimeTracker] Heartbeat script v2.1 loaded for', domain);
+  console.log('[TimeTracker] Heartbeat script v2.2 loaded for', domain);
   if (getSyncedEmail()) {
     console.log('[TimeTracker] Synced identity:', getSyncedEmail());
   } else {
