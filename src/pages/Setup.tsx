@@ -16,7 +16,7 @@ function buildScript(domains: string[]) {
   return `// ==UserScript==
 // @name         GSuite Time Tracker Heartbeat
 // @namespace    timetracker
-// @version      2.1
+// @version      2.2
 // @description  Sends activity heartbeats to your Time Tracker backend
 ${matchLines}
 // @grant        GM_xmlhttpRequest
@@ -52,7 +52,21 @@ ${matchLines}
   let selectorCache = null;
   let lastActivityLog = 0;
 
-  const domain = window.location.hostname;
+  // Resolve the effective domain, preferring compound-path selectors
+  // (e.g. "docs.google.com/spreadsheets") over the bare hostname.
+  const KNOWN_DOMAINS = ${JSON.stringify(domains)};
+  function resolveDomain() {
+    const host = window.location.hostname;
+    const path = window.location.pathname;
+    const matches = KNOWN_DOMAINS.filter(function(d) {
+      if (d === host) return true;
+      if (d.indexOf(host + '/') !== 0) return false;
+      const sub = d.slice(host.length); // "/spreadsheets"
+      return path === sub || path.indexOf(sub + '/') === 0;
+    }).sort(function(a, b) { return b.length - a.length; });
+    return matches[0] || host;
+  }
+  const domain = resolveDomain();
 
   // ── Identity via GM storage (synced from Dashboard) ──
   function getSyncedEmail() {
@@ -143,9 +157,17 @@ ${matchLines}
           'x-api-key': API_KEY,
         },
         data: JSON.stringify({ doc_identifier, title, domain, url, email }),
+        onload: function(r) {
+          if (r.status >= 200 && r.status < 300) {
+            lastSent = now;
+            console.log('[TimeTracker] Heartbeat sent for', title, '(' + domain + ') as', email);
+          } else {
+            console.warn('[TimeTracker] Heartbeat rejected', r.status, r.responseText);
+          }
+        },
+        onerror: function(e) { console.error('[TimeTracker] Heartbeat network error', e); },
+        ontimeout: function() { console.error('[TimeTracker] Heartbeat timed out'); },
       });
-      lastSent = now;
-      console.log('[TimeTracker] Heartbeat sent for', title, '(' + domain + ') as', email);
     } catch(e) { console.error('[TimeTracker] Heartbeat failed', e); }
   }
 
@@ -170,7 +192,7 @@ ${matchLines}
   });
 
   setInterval(sendHeartbeat, 30000);
-  console.log('[TimeTracker] Heartbeat script v2.1 loaded for', domain);
+  console.log('[TimeTracker] Heartbeat script v2.2 loaded for', domain);
   if (getSyncedEmail()) {
     console.log('[TimeTracker] Synced identity:', getSyncedEmail());
   } else {
@@ -484,7 +506,9 @@ export default function Setup() {
             <p className="text-sm text-foreground font-medium">
               ⚠️ After adding a new domain, copy the updated script above and reinstall it in Tampermonkey —
               Tampermonkey only reads the <code className="text-xs bg-muted px-1 rounded">@match</code> list at
-              install time, so existing installs won't pick up new domains automatically.
+              install time, so existing installs won't pick up new domains automatically. Compound-path
+              selectors (e.g. <code className="text-xs bg-muted px-1 rounded">docs.google.com/spreadsheets</code>)
+              also require a reinstall so the new domain resolver ships to Tampermonkey.
             </p>
             <div className="space-y-2 pt-2">
               {selectors.map((s: any) => (
